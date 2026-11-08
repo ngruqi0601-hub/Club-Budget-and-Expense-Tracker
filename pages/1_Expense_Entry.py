@@ -1,31 +1,159 @@
 import streamlit as st
+st.markdown("""
+    <style>
+    .stApp {
+    background-color: #F8F5FF !important;
+}
+.stApp h1,
+.stApp h2,
+.stApp h3 {
+    color: #8156C5 !important;
+    font-weight: bold;
+}
+.stApp h1 {
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+}
+    .stTextInput input,
+    .stNumberInput input {
+    background-color: #F3EDFF !important;
+}
+   div[data-testid="stSelectbox"] [data-baseweb="select"],
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div > div {
+    background-color: #F3EDFF !important;
+    border-radius: 10px !important;
+}
+    .stTextInput,
+    .stNumberInput,
+    .stSelectbox {
+        margin-bottom: 15px;
+}
+.stTextInput input:focus,
+.stNumberInput input:focus {
+    border: 2px solid #8156C5 !important;
+    box-shadow: 0 0 5px rgba(129, 86, 197, 0.3);
+}
+.stTextInput input:hover,
+.stNumberInput input:hover {
+    border: 1px solid #A080D5 !important;
+}
+.stTextInput label,
+.stNumberInput label,
+.stSelectbox label {
+    color: #60418F !important;
+    font-weight: bold !important;
+}
+.stTextInput input,
+.stNumberInput input {
+    color: #60418F !important;
+    font-weight: 500;
+}
+.stTextInput input::placeholder,
+.stNumberInput input::placeholder {
+    color: #B09ACF !important;
+    opacity: 1;
+}
+.stTextInput input,
+.stNumberInput input {
+    border-radius: 12px !important;
+}
+.stButton > button {
+    width:100% !important;
+    padding: 12px;
+    background-color: #8156C5 !important;
+    color: white !important;
+    border-radius: 12px !important;
+    border: none !important;
+    font-weight: bold;
+    transition: 0.3s ease;
+}
 
-st.title("Add New Expense")
+.stButton > button:hover {
+    background-color: #A080D5 !important;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+.stButton > button {
+    box-shadow: 0 4px 8px rgba(129, 86, 197, 0.25);
+}
+/* Back button */
+div[data-testid="stHorizontalBlock"] div:nth-child(1) .stButton > button {
+    background-color: #E9E1FF !important;
+    color: #8156C5 !important;
+}
+
+/* Next button */
+div[data-testid="stHorizontalBlock"] div:nth-child(2) .stButton > button {
+    background-color: #8156C5 !important;
+    color: white !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #FFFFFF !important;
+    border-radius: 15px !important;
+    border: 1px solid #E5D9F5 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    box-shadow: 0 6px 16px rgba(129, 86, 197, 0.18);
+    transition: 0.3s ease;
+}
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    padding: 10px !important;
+}
+.stButton > button:active {
+    transform: scale(0.97);
+    box-shadow: none;
+}
+.stNumberInput button {
+    color: #8156C5 !important;
+    border-radius: 8px !important;
+}
+.stSelectbox svg {
+    fill: #8156C5 !important;
+    color: #8156C5 !important;
+}
+div[data-testid="stAlert"] {
+    border-radius: 12px !important;
+    padding: 12px !important;
+}
+.stApp hr {
+    border-color: #D8C5F2 !important;
+    margin: 20px 0;
+}
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("Add New Expense💰")
+st.write("Please fill in the details of your expense below:")
+st.divider()
 
 if "expenses" not in st.session_state:
     st.session_state.expenses = []
+with st.container(border=True):
+    st.subheader("Expense Details")
+    expense_name = st.text_input("Expense Name")
 
-expense_name = st.text_input("Expense Name")
+    amount = st.number_input(
+                   "Amount (RM)",
+                    min_value=0.0,
+                    step=1.0
+     )
 
-amount = st.number_input(
-    "Amount (RM)",
-    min_value=0.0,
-    step=1.0
-)
-
-category = st.selectbox(
-    "Category",
-    [
-        "Food",
-        "Transportation",
-        "Equipment",
-        "Accommodation",
-        "Workshop Materials",
-        "Utilities",
-        "Competition Fees",
-        "Membership Activities",
-        "Others"
-    ]
+    category = st.selectbox(
+        "Category",
+      [
+          "Food",
+          "Transportation",
+          "Equipment",
+          "Accommodation",
+          "Workshop Materials",
+          "Utilities",
+          "Competition Fees",
+          "Membership Activities",
+          "Others"
+    ],
+      key="category",
 )
 
 if category == "Others":

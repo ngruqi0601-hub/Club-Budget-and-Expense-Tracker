@@ -1,4 +1,76 @@
 import streamlit as st
+st.markdown("""
+<style>
+
+/* Page background */
+.stApp {
+    background-color: #F8F5FF !important;
+}
+
+/* Headings */
+.stApp h1,
+.stApp h2,
+.stApp h3 {
+    color: #8156C5 !important;
+    font-weight: bold;
+}
+
+/* Paragraphs */
+.stApp [data-testid="stMarkdownContainer"] p {
+    color: #76658F;
+    line-height: 1.6;
+}
+
+/* Metric cards */
+div[data-testid="stMetric"] {
+    background-color: white;
+    border: 1px solid #E5D9F5;
+    border-radius: 15px;
+    padding: 18px;
+    box-shadow: 0 4px 12px rgba(129, 86, 197, 0.12);
+}
+
+/* Metric labels */
+div[data-testid="stMetricLabel"] {
+    color: #60418F !important;
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: #A080D5 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+}
+
+/* Force the button text to be white */
+.stButton > button p,
+.stButton > button span,
+.stButton > button div {
+    color: white !important;
+}
+
+.stButton > button:hover {
+    background-color: #8156C5 !important;
+}
+
+
+/* Divider */
+.stApp hr {
+    border-color: #D8C5F2 !important;
+}
+
+/* Table */
+div[data-testid="stDataFrame"] {
+    border: 1px solid #E5D9F5;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
 st.title("Expense History")
 if "expenses" not in st.session_state:
     st.session_state.expenses = []
