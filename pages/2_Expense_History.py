@@ -38,6 +38,24 @@ if st.button("Clear ALL Expenses",key="clear all"):
     st.session_state.expenses.clear()
     st.success("All Expenses Cleared Successfully")
     st.rerun()
+category_totals={}
+for expense in st.session_state.expenses:
+    category = expense["Category"]
+    amount = float(expense["Amount(RM)"])
+
+    if category not in category_totals:
+        category_totals[category] = 0
+
+    category_totals[category]+=amount
+st.subheader("Spending by Category")
+
+if category_totals:
+    st.bar_chart(
+        category_totals,
+        horizontal=True
+    )
+else:
+    st.info("No expense data available.")
 col1,col2=st.columns(2)
 with col1:
     if st.button("Back"):
@@ -45,3 +63,4 @@ with col1:
 with col2:
     if st.button("Next"):
        st.switch_page("pages/3_Budget_Setting.py")
+category_totals = {}
