@@ -1,4 +1,5 @@
 import streamlit as st
+from database import add_expense
 st.markdown("""
     <style>
     .stApp {
@@ -178,12 +179,7 @@ if st.button("Submit Expense", key="submit_expense"):
         st.warning("Please specify your category.")
 
     else:
-        st.session_state.expenses.append({
-            "Expense Name": expense_name,
-            "Amount(RM)": amount,
-            "Category": final_category
-        })
-
+        add_expense(expense_name, amount, final_category)
         st.success("Expense submitted successfully!")
 col1,col2=st.columns(2)
 with col1:

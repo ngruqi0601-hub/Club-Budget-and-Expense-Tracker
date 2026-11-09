@@ -1,4 +1,6 @@
 import streamlit as st
+from database import get_expenses,delete_expense
+import plotly.express as px
 st.markdown("""
 <style>
 
@@ -72,46 +74,67 @@ div[data-testid="stDataFrame"] {
 
 
 st.title("Expense History")
-if "expenses" not in st.session_state:
-    st.session_state.expenses = []
-
+# Calculate total expenses
 total_expenses = sum(
-    float(expense["Amount(RM)"])
-    for expense in st.session_state.expenses
+    expense[2] for expense in get_expenses()
 )
 
-expense_summary = st.session_state.expenses.copy()
-for expense in expense_summary:
-    expense["Amount(RM)"]=f"{float(expense['Amount(RM)']):.2f}"
-
-expense_summary.append({
-    "Expense Name": "TOTAL EXPENSES",
-    "Amount(RM)": f"{total_expenses:.2f}",
-    "Category": ""
-})
-
+# Display expense history
 st.subheader("Expenses History")
+expenses = [
+    {
+        "ID" : row[0],
+        "Expense Name": row[1],
+        "Amount(RM)": row[2],
+        "Category": row[3]
+    }
+    for row in get_expenses()
+]
+if expenses:
+    st.dataframe(
+        expenses,
+        use_container_width=True,
+        hide_index=True
+    )
 
-st.table(expense_summary)
-st.subheader("Delete Expense")
-if st.session_state.expenses:
-    cols=st.columns(len(st.session_state.expenses))
-    for i, expense in enumerate(st.session_state.expenses):
-        with cols[i]:
-            if st.button(
-               f"Delete {expense['Expense Name']}",
-               key=f"delete_{i}"
-            ):
-               st.session_state.expenses.pop(i)
-               st.rerun()
+    st.metric(
+        "Total Expenses",
+        f"RM {total_expenses:.2f}"
+    )
+
+    # Delete expense
+    st.subheader("Delete Expense")
+
+    for expense in expenses:
+        col1, col2 = st.columns([4, 1])
+
+        with col1:
+            st.write(expense["Expense Name"])
+
+        with col2:
+            if st.button("Delete", key=f"delete_{expense['ID']}"):
+                delete_expense(expense["ID"])
+                st.rerun()
+
+    # Spending by category
+    category_totals = {}
+
+    for expense in expenses:
+        category = expense["Category"]
+        amount = expense["Amount(RM)"]
+
+        if category not in category_totals:
+            category_totals[category] = 0
+
+        category_totals[category] += amount
+
+    st.subheader("Spending by Category")
+    
+
 else:
-    st.write("No expenses to delete.")
-if st.button("Clear ALL Expenses",key="clear all"):
-    st.session_state.expenses.clear()
-    st.success("All Expenses Cleared Successfully")
-    st.rerun()
+    st.info("No expenses recorded yet.")
 category_totals={}
-for expense in st.session_state.expenses:
+for expense in expenses:
     category = expense["Category"]
     amount = float(expense["Amount(RM)"])
 
@@ -120,6 +143,14 @@ for expense in st.session_state.expenses:
 
     category_totals[category]+=amount
 st.subheader("Spending by Category")
+fig = px.pie(
+    names=list(category_totals.keys()),
+    values=list(category_totals.values()),
+    title="Spending by Category",
+    hole=0.4
+)
+
+st.plotly_chart(fig, use_container_width=True)
 
 if category_totals:
     st.bar_chart(
