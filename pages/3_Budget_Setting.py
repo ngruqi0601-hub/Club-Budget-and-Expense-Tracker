@@ -1,4 +1,5 @@
 import streamlit as st
+from database import add_budget, get_budgets,get_expenses
 st.markdown("""
 <style>
 
@@ -76,43 +77,76 @@ div[data-testid="stMetricLabel"] {
 </style>
 """, unsafe_allow_html=True)
 st.title("Budget Setting")
-if "budget" not in st.session_state:
-    st.session_state.budget=0.0
-budget=st.number_input(
-    "Enter total budget(RM)",
+
+st.subheader("Set Category Budget")
+
+category = st.selectbox(
+    "Select Category",
+    [
+        "Food",
+        "Transportation",
+        "Equipment",
+        "Accommodation",
+        "Workshop Materials",
+        "Utilities",
+        "Competition Fees",
+        "Membership Activities",
+        "Others"
+    ]
+)
+
+budget_limit = st.number_input(
+    "Enter Budget Limit (RM)",
     min_value=0.0,
-    step=100.0
+    step=10.0
 )
-if st.button("Submit Budget",key="submit budget"):
-    if budget<=0:
-        st.warning("Please enter a value")
+
+if st.button("Submit Budget", key="submit_budget"):
+    if budget_limit <= 0:
+        st.warning("Please enter a valid budget limit.")
     else:
-        st.session_state.budget=budget
-        st.success("Budget submitted successfully!")
-st.subheader("Current BUdget:RM"+str(st.session_state.budget))
-if "expenses" not in st.session_state:
-    st.session_state.expenses = []
+        add_budget(category, budget_limit)
+        st.success(f"Budget for {category} submitted successfully!")
+st.divider()
+st.subheader("Budget Overview")
 
-total_expenses = sum(
-    float(expense["Amount(RM)"])
-    for expense in st.session_state.expenses
-)
-remaining_budget=st.session_state.budget-total_expenses
-st.metric("Total Budget" , f"RM{st.session_state.budget:.2f}")
-st.metric("Total Expenses", f"RM{total_expenses:.2f}")
-st.metric("Remaining Budget", f"RM{remaining_budget:.2f}")
-if remaining_budget < 0:
-    st.error("You have exceeded your budget!")
+budgets = get_budgets()
+expenses = get_expenses()
+category_totals = {}
 
-elif remaining_budget == 0:
-    st.warning("You have used your entire budget!")
+for expense in expenses:
+    category_name = expense[3]
+    amount = expense[2]
 
-else:
-    st.success("You are within your budget!")
-if st.session_state.budget > 0:
-    spending_ratio = total_expenses / st.session_state.budget
+    if category_name not in category_totals:
+        category_totals[category_name] = 0
 
-    st.subheader("Budget Usage")
-    st.progress(min(spending_ratio, 1.0))
+    category_totals[category_name] += amount
+if budgets:
+    for budget in budgets:
+        budget_id = budget[0]
+        category_name = budget[1]
+        budget_limit = budget[2]
+        actual_spending = category_totals.get(category_name, 0)
+        remaining = budget_limit - actual_spending
+        st.markdown(f"###{category_name}")
+        col1, col2, col3 = st.columns(3)
 
-    st.write(f"Budget Used: {spending_ratio * 100:.1f}%")
+        col1.metric("Budget", f"RM {budget_limit:.2f}")
+        col2.metric("Spent", f"RM {actual_spending:.2f}")
+        col3.metric("Remaining", f"RM {remaining:.2f}")
+        spending_ratio=actual_spending/budget_limit 
+        st.progress(min(spending_ratio,1.0))
+        st.write(f"Budget used:{spending_ratio*100:.1f}%")
+        if spending_ratio >= 1:
+            st.error("Budget exceeded!")
+
+        elif spending_ratio >= 0.8:
+            st.warning("You are approaching your budget limit!")
+
+        else:
+            st.success("Spending is within the budget.")
+            st.divider()
+    else:
+        st.info("No category budgets have been set yet.")
+    

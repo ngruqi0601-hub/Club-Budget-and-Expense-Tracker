@@ -14,6 +14,13 @@ def create_table():
             category TEXT NOT NULL
         )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS budgets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL UNIQUE,
+        budget_limit REAL NOT NULL
+    )
+""")
     conn.commit()
     conn.close()
 def add_expense(expense_name, amount, category):
@@ -27,6 +34,28 @@ def add_expense(expense_name, amount, category):
 
     conn.commit()
     conn.close()
+def add_budget(category, budget_limit):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO budgets (category, budget_limit)
+        VALUES (?, ?)
+    """, (category, budget_limit))
+
+    conn.commit()
+    conn.close()
+def get_budgets():
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM budgets")
+
+    budgets = cursor.fetchall()
+
+    conn.close()
+
+    return budgets
 def get_expenses():
     conn = create_connection()
     cursor = conn.cursor()
