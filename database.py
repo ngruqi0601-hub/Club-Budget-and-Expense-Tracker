@@ -45,6 +45,29 @@ def add_budget(category, budget_limit):
 
     conn.commit()
     conn.close()
+def update_budget(category, budget_limit):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE budgets
+        SET budget_limit = ?
+        WHERE category = ?
+    """, (budget_limit, category))
+
+    conn.commit()
+    conn.close()
+def delete_budget(category):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM budgets WHERE category = ?",
+        (category,)
+    )
+
+    conn.commit()
+    conn.close()
 def get_budgets():
     conn = create_connection()
     cursor = conn.cursor()

@@ -1,5 +1,5 @@
 import streamlit as st
-from database import add_budget, get_budgets,get_expenses
+from database import add_budget, get_budgets,get_expenses,update_budget,delete_budget
 st.markdown("""
 <style>
 
@@ -100,14 +100,75 @@ budget_limit = st.number_input(
     min_value=0.0,
     step=10.0
 )
-
 if st.button("Submit Budget", key="submit_budget"):
     if budget_limit <= 0:
         st.warning("Please enter a valid budget limit.")
+
+    elif any(row[1] == category for row in get_budgets()):
+        st.warning("A budget already exists for this category.")
+
     else:
         add_budget(category, budget_limit)
         st.success(f"Budget for {category} submitted successfully!")
+        st.rerun()
 st.divider()
+st.subheader("Update Existing Budget")
+
+budgets = get_budgets()
+
+if budgets:
+    existing_categories = [row[1] for row in budgets]
+
+    selected_category = st.selectbox(
+        "Select Category to Update",
+        existing_categories
+    )
+    current_budget = next(
+    row[2] for row in budgets
+    if row[1] == selected_category
+)
+    st.write(f"Current Budget: RM {current_budget:.2f}")
+    new_budget_limit = st.number_input(
+        "Enter New Budget Limit (RM)",
+        min_value=0.01,
+        value=float(current_budget),
+        step=10.0,
+        key=f"update_{selected_category}"
+    )
+    if st.button("Update Budget", key="update_budget"):
+       if new_budget_limit == current_budget:
+          st.warning("No changes detected.")
+       else:
+          update_budget(selected_category, new_budget_limit)
+          st.success(f"{selected_category} budget updated successfully!")
+          st.rerun()
+else:
+    st.info("No budgets available to update.")
+st.divider()
+st.subheader("Delete Existing Budget")
+
+budgets = get_budgets()
+
+if budgets:
+    delete_category = st.selectbox(
+        "Select Category to Delete",
+        [row[1] for row in budgets],
+        key="delete_category"
+    )
+    confirm_delete = st.checkbox(
+    "I confirm that I want to delete this budget."
+)
+
+    if st.button("Delete Budget", key="delete_budget"):
+       if confirm_delete:
+          delete_budget(delete_category)
+          st.success(f"{delete_category} budget deleted successfully!")
+          st.rerun()
+       else:
+          st.warning("Please confirm before deleting.")
+else:
+    st.info("No budgets available to delete.")
+
 st.subheader("Budget Overview")
 
 budgets = get_budgets()
