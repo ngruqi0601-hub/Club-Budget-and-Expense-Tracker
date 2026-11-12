@@ -1,5 +1,13 @@
 from narwhals import nth
 import streamlit as st
+from database import create_club,get_user_id
+if not st.session_state.get("logged_in",False):
+    st.warning("Please log in to access this page.")
+    st.switch_page("pages/0_Account.py")
+if st.button("Log Out"):
+    st.session_state.logged_in = False
+    st.session_state.username = ""
+    st.switch_page("pages/0_Account.py")
 
 st.set_page_config(
     page_title="Club Budget Tracker",
@@ -8,6 +16,9 @@ st.set_page_config(
 )
 st.markdown("""
     <style>
+    [data-testid="stSidebarNav"] {
+    display: none;
+}
     .stApp {
         background-color: #F8F5FF!important;
     }
@@ -79,6 +90,21 @@ div[data-testid="stMetric"]:hover {
 
 
 st.title("Club Budget and Expense Tracker")
+st.subheader("Create a Club")
+
+club_name = st.text_input("Enter Club Name")
+
+if st.button("Create Club"):
+    if not club_name.strip():
+        st.warning("Please enter a club name.")
+    else:
+        user_id = get_user_id(st.session_state.username)
+
+        invitation_code = create_club(club_name, user_id)
+
+        st.success("Club created successfully!")
+        st.write("Your invitation code:")
+        st.code(invitation_code)
 
 st.write("Welcome to our club financial management system!")
 st.subheader("Financial Overview")
