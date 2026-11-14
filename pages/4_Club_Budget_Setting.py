@@ -121,3 +121,11 @@ for budget in budgets:
                 st.error("Unable to delete budget.")
         else:
              st.info("No club budgets have been created yet.")
+col1,col2=st.columns(2)
+with col1:
+    if st.button("Back"):
+       st.switch_page("pages/3_Budget_Setting.py")
+with col2:
+    if st.button("Next"):
+       st.switch_page("pages/5_Club_Expense_Submission.py")
+category_totals = {}

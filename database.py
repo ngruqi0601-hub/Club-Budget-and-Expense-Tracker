@@ -23,6 +23,7 @@ def create_club(club_name, user_id):
 
     conn.commit()
     conn.close()
+    return invitation_code
 
 def join_club(invitation_code, user_id):
     conn = create_connection()
@@ -387,6 +388,137 @@ def login_user(username, password):
             return True
 
     return False
+def get_total_club_budget(club_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT SUM(budget_limit)
+        FROM club_budgets
+        WHERE club_id = ?
+    """, (club_id,))
+
+    result = cursor.fetchone()
+    conn.close()
+
+    return result[0] if result[0] is not None else 0
+def get_total_club_expenses(club_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT SUM(amount)
+        FROM club_expenses
+        WHERE club_id = ?
+          AND status = 'Approved'
+    """, (club_id,))
+
+    result = cursor.fetchone()
+    conn.close()
+
+    return result[0] if result[0] is not None else 0
+def get_category_expense_totals(club_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT category, SUM(amount)
+        FROM club_expenses
+        WHERE club_id = ?
+          AND status = 'Approved'
+        GROUP BY category
+    """, (club_id,))
+
+    expenses = cursor.fetchall()
+    conn.close()
+
+    return expenses
+
+def get_remaining_club_budget(club_id):
+    total_budget = get_total_club_budget(club_id) or 0
+    total_expenses = get_total_club_expenses(club_id) or 0
+
+    remaining = total_budget - total_expenses
+
+    return remaining
+def add_club_expense(club_id, user_id, expense_name, amount, category, receipt_path):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO club_expenses
+        (club_id, submitted_by, expense_name, amount, category, receipt_path)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (club_id, user_id, expense_name, amount, category, receipt_path))
+
+    conn.commit()
+    conn.close()
+def get_club_expenses(club_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, expense_name, amount, category,
+               submitted_by, receipt_path, status, created_at
+        FROM club_expenses
+        WHERE club_id = ?
+        ORDER BY created_at DESC
+    """, (club_id,))
+
+    expenses = cursor.fetchall()
+
+    conn.close()
+
+    return expenses
+def get_username(user_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT username
+        FROM users
+        WHERE id = ?
+    """, (user_id,))
+
+    result = cursor.fetchone()
+
+    conn.close()
+
+    if result:
+        return result[0]
+
+    return "Unknown User"
+def update_expense_status(expense_id, club_id, user_id, status):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT role
+            FROM memberships
+            WHERE user_id = ? AND club_id = ?
+        """, (user_id, club_id))
+
+        result = cursor.fetchone()
+
+        if result is None or result[0] != "Treasurer":
+            return False
+
+        if status not in ["Approved", "Rejected"]:
+            return False
+
+        cursor.execute("""
+            UPDATE club_expenses
+            SET status = ?
+            WHERE id = ? AND club_id = ? AND status = 'Pending'
+        """, (status, expense_id, club_id))
+
+        conn.commit()
+
+        return cursor.rowcount > 0
+
+    finally:
+        conn.close()
 if __name__ == "__main__":
     create_table()
     print("Database and expense table created successfully!")

@@ -1,6 +1,7 @@
 from narwhals import nth
 import streamlit as st
-from database import create_club,get_user_id,join_club,get_user_clubs
+import pandas as pd
+from database import create_club,get_user_id,join_club,get_user_clubs,get_total_club_budget,get_total_club_expenses,get_remaining_club_budget,get_category_expense_totals,get_club_budgets
 if not st.session_state.get("logged_in",False):
     st.warning("Please log in to access this page.")
     st.switch_page("pages/0_Account.py")
@@ -91,21 +92,6 @@ div[data-testid="stMetric"]:hover {
 
 st.title("Club Budget and Expense Tracker")
 st.write("Welcome to our club financial management system!")
-st.subheader("Create a Club")
-
-club_name = st.text_input("Enter Club Name")
-
-if st.button("Create Club"):
-    if not club_name.strip():
-        st.warning("Please enter a club name.")
-    else:
-        user_id = get_user_id(st.session_state.username)
-
-        invitation_code = create_club(club_name, user_id)
-
-        st.success("Club created successfully!")
-        st.write("Your invitation code:")
-        st.code(invitation_code)
 
 st.subheader("Join a Club")
 
@@ -129,25 +115,15 @@ if st.button("Join Club"):
         elif result == "already_joined":
             st.warning("You have already joined this club.")
 
+
+# My Clubs
 st.subheader("My Clubs")
 
 user_id = get_user_id(st.session_state.username)
-
 clubs = get_user_clubs(user_id)
 
 if clubs:
-    for club in clubs:
-        club_id = club[0]
-        club_name = club[1]
-        role = club[2]
 
-        st.write(f"**{club_name}**")
-        st.write(f"Role: {role}")
-        st.divider()
-else:
-    st.info("You haven't joined any clubs yet.")
-
-if clubs:
     club_options = {
         club[1]: club[0]
         for club in clubs
@@ -158,11 +134,206 @@ if clubs:
         options=list(club_options.keys())
     )
 
-    selected_club_id = club_options[selected_club]
-
-    st.session_state.selected_club_id = selected_club_id
+    club_id = club_options[selected_club]
+    st.session_state.selected_club_id = club_id
 
     st.success(f"Currently managing: {selected_club}")
+
+    # Club Financial Dashboard
+    st.divider()
+    st.subheader("Club Financial Dashboard")
+
+    total_budget = get_total_club_budget(club_id)
+    total_expenses = get_total_club_expenses(club_id)
+    remaining_budget = get_remaining_club_budget(club_id)
+    if total_budget > 0:
+       remaining_percentage = (remaining_budget / total_budget) * 100
+    else:
+       remaining_percentage = 0
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric("Total Budget", f"RM {total_budget:.2f}")
+
+    with col2:
+        st.metric("Total Expenses", f"RM {total_expenses:.2f}")
+
+    with col3:
+        st.metric(
+    "Remaining Budget",
+    f"RM {remaining_budget:.2f}",
+    delta=f"{remaining_percentage:.1f}% remaining"
+)
+    # Club Budget Usage
+    st.divider()
+    st.subheader("Club Budget Usage")
+
+    if total_budget > 0:
+
+        usage = total_expenses / total_budget
+
+        st.progress(min(usage, 1.0))
+        st.write(f"Budget Used: {usage * 100:.1f}%")
+        if usage > 1:
+           st.error("Club expenses have exceeded the total budget!")
+
+        elif usage >= 0.8:
+            st.warning(
+              "Attention! The club has used at least 80% of its budget."
+    )
+
+        else:
+            st.success("Club spending is within a healthy range.")
+    
+    
+            
+
+    else:
+        st.info("No club budget has been set yet.")
+
+    # Category Budget Analysis
+    st.divider()
+    st.subheader("Category Budget Analysis")
+
+    budgets = get_club_budgets(club_id)
+    category_expenses = get_category_expense_totals(club_id)
+
+    budget_dict = {
+        budget[1]: budget[2]
+        for budget in budgets
+    }
+
+    expense_dict = {
+        category: amount
+        for category, amount in category_expenses
+    }
+
+    # Approved Expenses Pie Chart
+    st.write("**Approved Expenses Distribution**")
+
+    if category_expenses:
+
+        chart_data = pd.DataFrame(
+            category_expenses,
+            columns=["Category", "Amount"]
+        )
+
+        st.vega_lite_chart(
+            chart_data,
+            {
+                "mark": {
+                    "type": "arc",
+                    "innerRadius": 50
+                },
+                "encoding": {
+                    "theta": {
+                        "field": "Amount",
+                        "type": "quantitative"
+                    },
+                    "color": {
+                        "field": "Category",
+                        "type": "nominal"
+                    },
+                    "tooltip": [
+                        {
+                            "field": "Category",
+                            "type": "nominal"
+                        },
+                        {
+                            "field": "Amount",
+                            "type": "quantitative"
+                        }
+                    ]
+                }
+            },
+            use_container_width=True
+        )
+
+    else:
+        st.info("No approved expenses available for the chart.")
+
+    # Category Budget Breakdown
+    st.divider()
+    st.write("**Budget Breakdown by Category**")
+
+    all_categories = sorted(
+        set(budget_dict) | set(expense_dict)
+    )
+
+    category_rows = []
+
+    for category in all_categories:
+
+        budget_limit = budget_dict.get(category, 0)
+        spent = expense_dict.get(category, 0)
+        remaining = budget_limit - spent
+
+        if category not in budget_dict:
+            status = "No Budget Allocated"
+
+        elif remaining < 0:
+            status = "Over Budget"
+
+        else:
+            status = "Within Budget"
+
+        category_rows.append({
+            "Category": category,
+            "Budget (RM)": round(budget_limit, 2),
+            "Approved Expenses (RM)": round(spent, 2),
+            "Remaining (RM)": round(remaining, 2),
+            "Status": status
+        })
+
+    if category_rows:
+
+        category_df = pd.DataFrame(category_rows)
+
+        st.dataframe(
+            category_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    else:
+        st.info("No category budgets or approved expenses yet.")
+    # Financial Insights
+    st.divider()
+    st.subheader("Financial Insights")
+
+    if category_expenses:
+
+        highest_category = max(
+            category_expenses,
+            key=lambda item: item[1]
+        )
+    # Category with the lowest remaining budget
+    if category_rows:
+
+        lowest_category = min(
+            category_rows,
+            key=lambda item: item["Remaining (RM)"]
+        )
+
+        st.info(
+            f"Lowest remaining budget: {lowest_category['Category']} "
+            f"(RM {lowest_category['Remaining (RM)']:.2f})"
+        )
+        st.info(
+            f"Highest spending category: {highest_category[0]} "
+            f"(RM {highest_category[1]:.2f})"
+        )
+
+    if total_budget > 0 and total_expenses > total_budget:
+        st.warning("The club has exceeded its overall budget.")
+
+    elif total_budget > 0:
+        st.success("The club is currently within its overall budget.")
+else:
+    st.info("You haven't joined any clubs yet.")
+
+
 
 st.subheader("Financial Overview")
 

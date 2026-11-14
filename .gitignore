@@ -2,3 +2,4 @@ club_budget.db
 club_budget_backup.db
 __pycache__/
 *.pyc
+receipts/
