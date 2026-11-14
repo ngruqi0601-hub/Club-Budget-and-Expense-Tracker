@@ -1,5 +1,8 @@
 import streamlit as st
 from database import add_budget, get_budgets,get_expenses,update_budget,delete_budget
+if not st.session_state.get("logged_in", False):
+    st.warning("Please log in to access this page.")
+    st.switch_page("pages/0_Account.py")
 st.markdown("""
 <style>
 
@@ -210,4 +213,12 @@ if budgets:
             st.divider()
     else:
         st.info("No category budgets have been set yet.")
+col1,col2=st.columns(2)
+with col1:
+    if st.button("Back"):
+       st.switch_page("pages/2_Expense_History.py")
+with col2:
+    if st.button("Next"):
+       st.switch_page("pages/4_Club_Budget_Setting.py")
+category_totals = {}
     

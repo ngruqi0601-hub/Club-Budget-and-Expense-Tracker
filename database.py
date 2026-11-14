@@ -24,6 +24,41 @@ def create_club(club_name, user_id):
     conn.commit()
     conn.close()
 
+def join_club(invitation_code, user_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Find the club using its invitation code
+        cursor.execute("""
+            SELECT id
+            FROM clubs
+            WHERE invitation_code = ?
+        """, (invitation_code.strip().upper(),))
+
+        club = cursor.fetchone()
+
+        # Check whether the invitation code exists
+        if club is None:
+            return "invalid"
+
+        club_id = club[0]
+
+        # Add the user as a club member
+        cursor.execute("""
+            INSERT INTO memberships (user_id, club_id, role)
+            VALUES (?, ?, ?)
+        """, (user_id, club_id, "Member"))
+
+        conn.commit()
+        return "success"
+
+    except sqlite3.IntegrityError:
+        return "already_joined"
+
+    finally:
+        conn.close()
+
     return invitation_code
 def get_user_clubs(user_id):
     conn = create_connection()
@@ -40,6 +75,23 @@ def get_user_clubs(user_id):
     conn.close()
 
     return clubs
+def get_user_club_role(user_id, club_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT role
+        FROM memberships
+        WHERE user_id = ? AND club_id = ?
+    """, (user_id, club_id))
+
+    result = cursor.fetchone()
+    conn.close()
+
+    if result:
+        return result[0]
+
+    return None
 def get_user_id(username):
     conn = create_connection()
     cursor = conn.cursor()
@@ -58,6 +110,77 @@ def get_user_id(username):
         return result[0]
 
     return None
+
+def add_club_budget(club_id, category, budget_limit):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            INSERT INTO club_budgets (club_id, category, budget_limit)
+            VALUES (?, ?, ?)
+        """, (club_id, category, budget_limit))
+
+        conn.commit()
+        return True
+
+    except sqlite3.IntegrityError:
+        return False
+
+    finally:
+        conn.close()
+
+def get_club_budgets(club_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, category, budget_limit
+        FROM club_budgets
+        WHERE club_id = ?
+    """, (club_id,))
+
+    budgets = cursor.fetchall()
+
+    conn.close()
+
+    return budgets
+
+def update_club_budget(club_id, category, new_budget_limit):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE club_budgets
+        SET budget_limit = ?
+        WHERE club_id = ? AND category = ?
+    """, (new_budget_limit, club_id, category))
+
+    conn.commit()
+
+    updated = cursor.rowcount > 0
+
+    conn.close()
+
+    return updated
+
+def delete_club_budget(club_id, category):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        DELETE FROM club_budgets
+        WHERE club_id = ? AND category = ?
+    """, (club_id, category))
+
+    conn.commit()
+
+    deleted = cursor.rowcount > 0
+
+    conn.close()
+
+    return deleted
+
 def create_connection():
     conn = sqlite3.connect("club_budget.db")
     conn.execute("PRAGMA foreign_keys = ON")
@@ -109,6 +232,36 @@ def create_table():
         UNIQUE(user_id, club_id)
     )
 """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS club_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            club_id INTEGER NOT NULL,
+            submitted_by INTEGER NOT NULL,
+            expense_name TEXT NOT NULL,
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            receipt_path TEXT,
+            status TEXT NOT NULL DEFAULT 'Pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+            FOREIGN KEY (club_id) REFERENCES clubs(id),
+            FOREIGN KEY (submitted_by) REFERENCES users(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS club_budgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            club_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            budget_limit REAL NOT NULL,
+
+            FOREIGN KEY (club_id) REFERENCES clubs(id),
+            UNIQUE (club_id, category)
+        )
+    """)
+
     conn.commit()
     conn.close()
 def add_expense(expense_name, amount, category):

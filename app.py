@@ -1,6 +1,6 @@
 from narwhals import nth
 import streamlit as st
-from database import create_club,get_user_id
+from database import create_club,get_user_id,join_club,get_user_clubs
 if not st.session_state.get("logged_in",False):
     st.warning("Please log in to access this page.")
     st.switch_page("pages/0_Account.py")
@@ -90,6 +90,7 @@ div[data-testid="stMetric"]:hover {
 
 
 st.title("Club Budget and Expense Tracker")
+st.write("Welcome to our club financial management system!")
 st.subheader("Create a Club")
 
 club_name = st.text_input("Enter Club Name")
@@ -106,7 +107,63 @@ if st.button("Create Club"):
         st.write("Your invitation code:")
         st.code(invitation_code)
 
-st.write("Welcome to our club financial management system!")
+st.subheader("Join a Club")
+
+invitation_code = st.text_input("Enter Invitation Code")
+
+if st.button("Join Club"):
+    if not invitation_code.strip():
+        st.warning("Please enter an invitation code.")
+
+    else:
+        user_id = get_user_id(st.session_state.username)
+
+        result = join_club(invitation_code, user_id)
+
+        if result == "success":
+            st.success("You have successfully joined the club!")
+
+        elif result == "invalid":
+            st.error("Invalid invitation code.")
+
+        elif result == "already_joined":
+            st.warning("You have already joined this club.")
+
+st.subheader("My Clubs")
+
+user_id = get_user_id(st.session_state.username)
+
+clubs = get_user_clubs(user_id)
+
+if clubs:
+    for club in clubs:
+        club_id = club[0]
+        club_name = club[1]
+        role = club[2]
+
+        st.write(f"**{club_name}**")
+        st.write(f"Role: {role}")
+        st.divider()
+else:
+    st.info("You haven't joined any clubs yet.")
+
+if clubs:
+    club_options = {
+        club[1]: club[0]
+        for club in clubs
+    }
+
+    selected_club = st.selectbox(
+        "Select a Club",
+        options=list(club_options.keys())
+    )
+
+    selected_club_id = club_options[selected_club]
+
+    st.session_state.selected_club_id = selected_club_id
+
+    st.success(f"Currently managing: {selected_club}")
+
 st.subheader("Financial Overview")
 
 col1, col2, col3 = st.columns(3)

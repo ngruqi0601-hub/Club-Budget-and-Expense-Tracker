@@ -1,5 +1,8 @@
 import streamlit as st
 from database import add_expense
+if not st.session_state.get("logged_in", False):
+    st.warning("Please log in to access this page.")
+    st.switch_page("pages/0_Account.py")
 st.markdown("""
     <style>
     .stApp {
