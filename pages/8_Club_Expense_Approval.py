@@ -101,18 +101,17 @@ if pending_expenses:
         category = expense[3]
         submitted_by = expense[4]
         receipt_path = expense[5]
-        description = expense[8]
-
+        
         if description and str(description).strip():
             st.write(f"**Description:** {description}")
         else:
-            st.write("**Description:** No description")
+            st.write("**Description:** No description provided.")
 
         st.subheader(expense_name)
 
         st.write(f"**Amount:** RM {amount:.2f}")
         st.write(f"**Category:** {category}")
-        st.write(f"**Submitted By:** {expense[4]}")
+        st.write(f"**Submitted By:** {submitted_by}")
 
         # Member's Description
         if description and description.strip():
