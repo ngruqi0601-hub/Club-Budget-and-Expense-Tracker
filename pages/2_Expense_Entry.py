@@ -1,8 +1,11 @@
 import streamlit as st
 from database import add_expense
+from navigation import show_finance_sidebar
 if not st.session_state.get("logged_in", False):
     st.warning("Please log in to access this page.")
     st.switch_page("pages/0_Account.py")
+show_finance_sidebar()
+#page design
 st.markdown("""
     <style>
     .stApp {
@@ -182,12 +185,15 @@ if st.button("Submit Expense", key="submit_expense"):
         st.warning("Please specify your category.")
 
     else:
-        add_expense(expense_name, amount, final_category)
+        user_id = st.session_state.user_id
+        add_expense(user_id, expense_name, amount, final_category)
         st.success("Expense submitted successfully!")
-col1,col2=st.columns(2)
+col1, col2 = st.columns(2)
+
 with col1:
     if st.button("Back"):
-       st.switch_page("app.py")
-with col2: 
-     if st.button("Next"):
-        st.switch_page("pages/2_Expense_History.py")
+        st.switch_page("pages/10_Personal_Dashboard.py")
+
+with col2:
+    if st.button("Next"):
+        st.switch_page("pages/3_Expense_History.py")

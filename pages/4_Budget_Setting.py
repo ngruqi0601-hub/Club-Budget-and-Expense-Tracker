@@ -1,8 +1,11 @@
 import streamlit as st
 from database import add_budget, get_budgets,get_expenses,update_budget,delete_budget
+from navigation import show_finance_sidebar
 if not st.session_state.get("logged_in", False):
     st.warning("Please log in to access this page.")
     st.switch_page("pages/0_Account.py")
+show_finance_sidebar()
+#page design
 st.markdown("""
 <style>
 
@@ -80,7 +83,7 @@ div[data-testid="stMetricLabel"] {
 </style>
 """, unsafe_allow_html=True)
 st.title("Budget Setting")
-
+user_id=st.session_state.user_id
 st.subheader("Set Category Budget")
 
 category = st.selectbox(
@@ -107,17 +110,17 @@ if st.button("Submit Budget", key="submit_budget"):
     if budget_limit <= 0:
         st.warning("Please enter a valid budget limit.")
 
-    elif any(row[1] == category for row in get_budgets()):
+    elif any(row[1] == category for row in get_budgets(user_id)):
         st.warning("A budget already exists for this category.")
 
     else:
-        add_budget(category, budget_limit)
+        add_budget(user_id,category, budget_limit)
         st.success(f"Budget for {category} submitted successfully!")
         st.rerun()
 st.divider()
 st.subheader("Update Existing Budget")
 
-budgets = get_budgets()
+budgets = get_budgets(user_id)
 
 if budgets:
     existing_categories = [row[1] for row in budgets]
@@ -142,7 +145,7 @@ if budgets:
        if new_budget_limit == current_budget:
           st.warning("No changes detected.")
        else:
-          update_budget(selected_category, new_budget_limit)
+          update_budget(user_id,selected_category, new_budget_limit)
           st.success(f"{selected_category} budget updated successfully!")
           st.rerun()
 else:
@@ -150,7 +153,7 @@ else:
 st.divider()
 st.subheader("Delete Existing Budget")
 
-budgets = get_budgets()
+budgets = get_budgets(user_id)
 
 if budgets:
     delete_category = st.selectbox(
@@ -164,7 +167,7 @@ if budgets:
 
     if st.button("Delete Budget", key="delete_budget"):
        if confirm_delete:
-          delete_budget(delete_category)
+          delete_budget(user_id,delete_category)
           st.success(f"{delete_category} budget deleted successfully!")
           st.rerun()
        else:
@@ -174,8 +177,8 @@ else:
 
 st.subheader("Budget Overview")
 
-budgets = get_budgets()
-expenses = get_expenses()
+budgets = get_budgets(user_id)
+expenses = get_expenses(user_id)
 category_totals = {}
 
 for expense in expenses:
@@ -213,12 +216,12 @@ if budgets:
             st.divider()
     else:
         st.info("No category budgets have been set yet.")
-col1,col2=st.columns(2)
+col1, col2 = st.columns(2)
+
 with col1:
     if st.button("Back"):
-       st.switch_page("pages/2_Expense_History.py")
+        st.switch_page("pages/3_Expense_History.py")
+
 with col2:
     if st.button("Next"):
-       st.switch_page("pages/4_Club_Budget_Setting.py")
-category_totals = {}
-    
+        st.switch_page("pages/10_Personal_Dashboard.py")

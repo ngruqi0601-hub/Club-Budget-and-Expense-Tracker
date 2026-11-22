@@ -1,5 +1,27 @@
+# Database files
 club_budget.db
 club_budget_backup.db
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+
+# Uploaded receipts
 receipts/
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# IDE and system files
+.vscode/
+.DS_Store
+Thumbs.db

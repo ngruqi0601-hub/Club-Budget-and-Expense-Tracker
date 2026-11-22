@@ -1,9 +1,13 @@
 import streamlit as st
 from database import get_expenses,delete_expense
 import plotly.express as px
+from navigation import show_finance_sidebar
 if not st.session_state.get("logged_in", False):
     st.warning("Please log in to access this page.")
     st.switch_page("pages/0_Account.py")
+
+show_finance_sidebar()
+#page design
 st.markdown("""
 <style>
 
@@ -78,20 +82,23 @@ div[data-testid="stDataFrame"] {
 
 st.title("Expense History")
 # Calculate total expenses
+user_id=st.session_state.user_id
 total_expenses = sum(
-    expense[2] for expense in get_expenses()
+    expense[2] for expense in get_expenses(user_id)
 )
 
 # Display expense history
 st.subheader("Expenses History")
+user_id = st.session_state.user_id
+
 expenses = [
     {
-        "ID" : row[0],
+        "ID": row[0],
         "Expense Name": row[1],
         "Amount(RM)": row[2],
         "Category": row[3]
     }
-    for row in get_expenses()
+    for row in get_expenses(user_id)
 ]
 if expenses:
     st.dataframe(
@@ -116,7 +123,7 @@ if expenses:
 
         with col2:
             if st.button("Delete", key=f"delete_{expense['ID']}"):
-                delete_expense(expense["ID"])
+                delete_expense(expense["ID"],user_id)
                 st.rerun()
 
     # Spending by category
@@ -162,11 +169,12 @@ if category_totals:
     )
 else:
     st.info("No expense data available.")
-col1,col2=st.columns(2)
+col1, col2 = st.columns(2)
+
 with col1:
     if st.button("Back"):
-       st.switch_page("pages/1_Expense_Entry.py")
+        st.switch_page("pages/2_Expense_Entry.py")
+
 with col2:
     if st.button("Next"):
-       st.switch_page("pages/3_Budget_Setting.py")
-category_totals = {}
+        st.switch_page("pages/4_Budget_Setting.py")
