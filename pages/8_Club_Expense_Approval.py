@@ -85,6 +85,9 @@ pending_expenses = [
     expense for expense in expenses
     if expense[6] == "Pending"
 ]
+st.write("Selected Club ID:", club_id)
+st.write("All Expenses:", expenses)
+st.write("Expense Statuses:", [repr(expense[6]) for expense in expenses])
 
 
 # --------------------------------
@@ -101,11 +104,9 @@ if pending_expenses:
         category = expense[3]
         submitted_by = expense[4]
         receipt_path = expense[5]
-        
-        if description and str(description).strip():
-            st.write(f"**Description:** {description}")
-        else:
-            st.write("**Description:** No description provided.")
+        status = expense[6]
+        description = expense[8]
+
 
         st.subheader(expense_name)
 
