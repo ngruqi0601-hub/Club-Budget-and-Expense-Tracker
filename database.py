@@ -26,7 +26,7 @@ def create_club(club_name, user_id):
 
     conn.commit()
     conn.close()
-    return invitation_code
+    return club_id, invitation_code
 
 def join_club(invitation_code, user_id):
     conn = create_connection()

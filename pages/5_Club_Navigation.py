@@ -4,7 +4,8 @@ import streamlit as st
 from database import (
     get_user_id,
     join_club,
-    get_user_clubs
+    get_user_clubs,
+    create_club
 )
 
 from navigation import show_finance_sidebar,show_custom_style
@@ -38,13 +39,45 @@ if not st.session_state.get("logged_in", False):
 
 
 # ==================================
-# 4. PAGE TITLE
+# 4. PAGE TITLE and create club
 # ==================================
 
 st.title("🏢 Club Finance")
 st.write("Select a club and choose a page to continue.")
 st.divider()
+st.divider()
+st.subheader("Create a New Club")
 
+with st.expander("Create Club"):
+    new_club_name = st.text_input(
+        "Club Name",
+        key="new_club_name"
+    )
+
+    if st.button("Create Club", key="create_club"):
+
+        if not new_club_name.strip():
+            st.warning("Please enter a club name.")
+
+        else:
+            try:
+                club_id, invitation_code = create_club(
+                    new_club_name.strip(),
+                    user_id
+                )
+
+                st.session_state.selected_club_id = club_id
+                st.session_state.selected_club_name = new_club_name.strip()
+
+                st.success("Club created successfully!")
+                st.write(f"**Invitation Code:** {invitation_code}")
+
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Unable to create club: {e}")
+
+st.divider()
 
 # ==================================
 # 5. JOIN A CLUB
