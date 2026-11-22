@@ -80,3 +80,10 @@ Club-Budget-and-Expense-Tracker/
 3. Navigate to the desired feature.
 4. Record expenses, manage budgets, or submit expense requests.
 5. Track financial records and monitor payment status.
+## Author
+
+**Name:** NG RU QI
+
+**Project:** Club Budget and Expense Tracker
+
+**Institution:** Universiti Teknologi Malaysia (UTM)
