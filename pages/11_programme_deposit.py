@@ -13,7 +13,8 @@ from database import (
     update_participant_payment_status,
     update_participant_payment_proof,
     update_programme,
-    update_participant_details
+    update_participant_details,
+    delete_participant_payment_proof
 )
 
 from navigation import (
@@ -529,6 +530,23 @@ if programmes:
 
                         except Exception as e:
                             st.warning(f"Unable to retrieve payment receipt: {e}")
+                        if role == "Treasurer":
+
+                            if st.button(
+                                "Delete Receipt",
+                                key=f"delete_receipt_{participant_id}"
+                            ):
+
+                                deleted = delete_participant_payment_proof(
+                                    participant_id,
+                                    selected_programme[0]
+                                )
+
+                                if deleted:
+                                    st.success("Receipt removed successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error("Unable to remove receipt.")
 
                     else:
 

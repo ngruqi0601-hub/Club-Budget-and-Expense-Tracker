@@ -1002,6 +1002,26 @@ def update_participant_details(participant_id, programme_id, participant_name, p
     conn.close()
 
     return updated
+def delete_participant_payment_proof(
+    participant_id,
+    programme_id
+):
+    conn = create_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE programme_participants
+        SET payment_proof = NULL
+        WHERE id = ? AND programme_id = ?
+    """, (participant_id, programme_id))
+
+    conn.commit()
+
+    updated = cursor.rowcount > 0
+
+    conn.close()
+
+    return updated
 if __name__ == "__main__":
     create_table()
     update_club_expenses_table()
