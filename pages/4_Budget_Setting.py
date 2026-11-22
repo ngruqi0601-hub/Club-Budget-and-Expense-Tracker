@@ -129,16 +129,15 @@ if budgets:
         "Select Category to Update",
         existing_categories
     )
-    current_budget = next(
-    (
-        float(row[2])
-        for row in budgets
-        if row[1] == selected_category
-        and row[2] is not None
-        and str(row[2]).strip() != ""
-    ),
-    0.0
-)
+    current_budget = 0.0
+
+    for row in budgets:
+        if row[1] == selected_category:
+            try:
+                current_budget = float(row[2])
+            except (ValueError, TypeError):
+                current_budget = 0.0
+        break
     st.write(f"Current Budget: RM {current_budget:.2f}")
     new_budget_limit = st.number_input(
         "Enter New Budget Limit (RM)",
@@ -199,16 +198,20 @@ if budgets:
     for budget in budgets:
         budget_id = budget[0]
         category_name = budget[1]
-        budget_limit = float(budget[2])
+        try:
+            budget_limit = float(budget[2])
+        except (ValueError, TypeError):
+            st.warning(f"Invalid budget value for {category_name}. Please update this budget.")
+            continue
         actual_spending = category_totals.get(category_name, 0)
         remaining = budget_limit - actual_spending
+        spending_ratio = actual_spending / budget_limit if budget_limit > 0 else 0
         st.markdown(f"###{category_name}")
         col1, col2, col3 = st.columns(3)
 
         col1.metric("Budget", f"RM {budget_limit:.2f}")
         col2.metric("Spent", f"RM {actual_spending:.2f}")
         col3.metric("Remaining", f"RM {remaining:.2f}")
-        spending_ratio=actual_spending/budget_limit 
         st.progress(min(spending_ratio,1.0))
         st.write(f"Budget used:{spending_ratio*100:.1f}%")
         if spending_ratio >= 1:
