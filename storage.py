@@ -12,3 +12,37 @@ def get_supabase_client():
     )
 
     return supabase
+import uuid
+import os
+
+# Upload receipt to Supabase Storage
+def upload_receipt(receipt, club_id):
+
+    supabase = get_supabase_client()
+
+    file_extension = os.path.splitext(receipt.name)[1]
+
+    file_name = f"{uuid.uuid4().hex}{file_extension}"
+
+    file_path = f"{club_id}/{file_name}"
+
+    supabase.storage.from_("receipts").upload(
+        file_path,
+        receipt.getvalue(),
+        {
+            "content-type": receipt.type,
+            "upsert": "false"
+        }
+    )
+
+    return file_path
+# Download receipt from Supabase Storage
+def download_receipt(file_path):
+
+    supabase = get_supabase_client()
+
+    receipt_data = supabase.storage.from_("receipts").download(
+        file_path
+    )
+
+    return receipt_data

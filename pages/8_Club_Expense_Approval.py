@@ -1,7 +1,7 @@
 
 import streamlit as st
 import os
-
+from storage import download_receipt
 from database import (
     get_club_expenses,
     get_user_id,
@@ -116,27 +116,31 @@ if pending_expenses:
             st.write("**Description:** No description provided.")
 
         # Display Receipt
-        if receipt_path and os.path.exists(receipt_path):
+        if receipt_path:
+            try:
+                receipt_data = download_receipt(receipt_path)
 
-            if receipt_path.lower().endswith((".png", ".jpg", ".jpeg")):
+                if receipt_path.lower().endswith((".png", ".jpg", ".jpeg")):
+                    st.image(
+                        receipt_data,
+                        caption="Uploaded Receipt",
+                        width=250
+                    )
 
-                st.image(
-                    receipt_path,
-                    caption="Uploaded Receipt"
-                )
-
-            elif receipt_path.lower().endswith(".pdf"):
-
-                with open(receipt_path, "rb") as file:
+                elif receipt_path.lower().endswith(".pdf"):
                     st.download_button(
                         label="Download Receipt",
-                        data=file,
+                        data=receipt_data,
                         file_name=os.path.basename(receipt_path),
+                        mime="application/pdf",
                         key=f"receipt_{expense_id}"
                     )
 
+            except Exception as e:
+                st.warning(f"Unable to retrieve receipt: {e}")
+
         else:
-            st.warning("Receipt file not found.")
+            st.warning("No receipt uploaded.")
 
         # Treasurer's Optional Remarks
         remarks = st.text_area(

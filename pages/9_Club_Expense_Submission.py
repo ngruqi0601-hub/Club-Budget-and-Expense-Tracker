@@ -2,7 +2,7 @@
 import streamlit as st
 import os
 import uuid
-
+from storage import upload_receipt
 from database import (
     add_club_expense,
     get_user_id,
@@ -140,14 +140,27 @@ if st.button("Submit Expense"):
 
     else:
 
-        file_extension = os.path.splitext(receipt.name)[1]
+        try:
+            receipt_path = upload_receipt(receipt, club_id)
 
-        file_name = f"{uuid.uuid4().hex}{file_extension}"
+            add_club_expense(
+                club_id,
+                user_id,
+                expense_name,
+                amount,
+                category,
+                receipt_path
+            )
 
-        receipt_path = os.path.join("receipts", file_name)
+            st.session_state.club_expense_name = ""
+            st.session_state.club_expense_receipt = None
 
-        with open(receipt_path, "wb") as file:
-            file.write(receipt.getbuffer())
+            st.success("Expense submitted successfully!")
+            st.info("Your expense is pending Treasurer approval.")
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"Unable to submit expense: {e}")
 
         add_club_expense(
             club_id,
