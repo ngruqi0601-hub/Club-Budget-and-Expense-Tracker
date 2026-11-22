@@ -142,7 +142,7 @@ if budgets:
     new_budget_limit = st.number_input(
         "Enter New Budget Limit (RM)",
         min_value=0.01,
-        value=float(current_budget),
+        value=max(float(current_budget), 0.01),
         step=10.0,
         key=f"update_{selected_category}"
     )
