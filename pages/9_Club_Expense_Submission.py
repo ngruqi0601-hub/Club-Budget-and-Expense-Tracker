@@ -155,7 +155,7 @@ if st.button("Submit Expense"):
             st.success("Expense submitted successfully!")
             st.info("Your expense is pending Treasurer approval.")
 
-            st.rerun()
+            
 
         except Exception as e:
             st.error(f"Unable to submit expense: {e}")
