@@ -207,49 +207,33 @@ def add_club_expense(
     conn = create_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        INSERT INTO club_expenses
-        (
-            club_id,
-            submitted_by,
-            expense_name,
-            amount,
-            category,
-            receipt_path,
-            description
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (
-        club_id,
-        user_id,
-        expense_name,
-        amount,
-        category,
-        receipt_path,
-        description
-    ))
-
-    conn.commit()
-    conn.close()
 def get_club_expenses(club_id):
     conn = create_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id, expense_name, amount, category,
-               submitted_by, receipt_path, status, created_at,
-               description,treasurer_remarks
+        SELECT
+            club_expenses.id,
+            club_expenses.expense_name,
+            club_expenses.amount,
+            club_expenses.category,
+            users.username,
+            club_expenses.receipt_path,
+            club_expenses.status,
+            club_expenses.created_at,
+            club_expenses.description,
+            club_expenses.treasurer_remarks
         FROM club_expenses
-        WHERE club_id = ?
-        ORDER BY created_at DESC
+        JOIN users
+        ON club_expenses.submitted_by = users.id
+        WHERE club_expenses.club_id = ?
+        ORDER BY club_expenses.created_at DESC
     """, (club_id,))
 
     expenses = cursor.fetchall()
-
     conn.close()
 
     return expenses
-   
 def get_username(user_id):
     conn = create_connection()
     cursor = conn.cursor()
