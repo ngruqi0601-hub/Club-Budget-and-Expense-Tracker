@@ -207,6 +207,31 @@ def add_club_expense(
     conn = create_connection()
     cursor = conn.cursor()
 
+    cursor.execute("""
+        INSERT INTO club_expenses (
+            club_id,
+            submitted_by,
+            expense_name,
+            amount,
+            category,
+            receipt_path,
+            description,
+            status,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)
+    """, (
+        club_id,
+        user_id,
+        expense_name,
+        amount,
+        category,
+        receipt_path,
+        description
+    ))
+
+    conn.commit()
+    conn.close()
 def get_club_expenses(club_id):
     conn = create_connection()
     cursor = conn.cursor()

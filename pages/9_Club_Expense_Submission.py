@@ -149,9 +149,9 @@ if st.button("Submit Expense"):
                 expense_name,
                 amount,
                 category,
-                receipt_path
+                receipt_path,
+                description
             )
-
             st.success("Expense submitted successfully!")
             st.info("Your expense is pending Treasurer approval.")
 
