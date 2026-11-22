@@ -129,10 +129,16 @@ if budgets:
         "Select Category to Update",
         existing_categories
     )
-    current_budget = float(next(
-    row[2] for row in budgets
-    if row[1] == selected_category
-))
+    current_budget = next(
+    (
+        float(row[2])
+        for row in budgets
+        if row[1] == selected_category
+        and row[2] is not None
+        and str(row[2]).strip() != ""
+    ),
+    0.0
+)
     st.write(f"Current Budget: RM {current_budget:.2f}")
     new_budget_limit = st.number_input(
         "Enter New Budget Limit (RM)",
