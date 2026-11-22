@@ -152,30 +152,10 @@ if st.button("Submit Expense"):
                 receipt_path
             )
 
-            st.session_state.club_expense_name = ""
-            st.session_state.club_expense_receipt = None
-
             st.success("Expense submitted successfully!")
             st.info("Your expense is pending Treasurer approval.")
+
             st.rerun()
 
         except Exception as e:
             st.error(f"Unable to submit expense: {e}")
-
-        add_club_expense(
-            club_id,
-            user_id,
-            expense_name,
-            amount,
-            category,
-            receipt_path
-        )
-
-        st.session_state.club_expense_name = ""
-        st.session_state.club_expense_receipt = None
-
-        st.success("Expense submitted successfully!")
-        st.info("Your expense is now pending Treasurer approval.")
-
-        st.rerun()
-        
