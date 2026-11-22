@@ -2,6 +2,7 @@
 import streamlit as st
 import os
 import pandas as pd
+from storage import upload_receipt,download_receipt
 from database import (
     get_user_id,
     get_user_club_role,
@@ -455,6 +456,7 @@ if programmes:
                     st.caption(participant_email)
                     st.caption(f"Registered: {registered_at}")
 
+                    
                     # UPLOAD RECEIPT
 
                     if role == "Treasurer":
@@ -465,29 +467,29 @@ if programmes:
                             key=f"payment_proof_{participant_id}"
                         )
 
-                        if uploaded_file is not None and (
-                            payment_proof is None or
-                            os.path.basename(payment_proof) != uploaded_file.name
-                            ):
-                            os.makedirs("payment_proofs", exist_ok=True)
+                        if uploaded_file is not None and payment_proof is None:
 
-                            file_path = os.path.join(
-                                "payment_proofs",
-                                f"participant_{participant_id}_{uploaded_file.name}"
-                            )
+                            try:
+                                file_path = upload_receipt(
+                                    uploaded_file,
+                                    selected_programme[0]
+                                )
 
-                            with open(file_path, "wb") as file:
-                                file.write(uploaded_file.getbuffer())
+                                updated = update_participant_payment_proof(
+                                    participant_id,
+                                    selected_programme[0],
+                                    file_path
+                                )
 
-                            updated = update_participant_payment_proof(
-                                participant_id,
-                                selected_programme[0],
-                                file_path
-                            )
+                                if updated:
+                                    st.success("Payment receipt uploaded!")
+                                    st.rerun()
+                                else:
+                                    st.error("Unable to save payment receipt path.")
 
-                            if updated:
-                                st.success("Payment receipt uploaded!")
-                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Receipt upload failed: {e}")
+
 
                     # DISPLAY RECEIPT
 
@@ -495,32 +497,43 @@ if programmes:
 
                         st.write("**Uploaded Payment Proof:**")
 
-                        file_extension = payment_proof.split(".")[-1].lower()
+                        try:
+                            receipt_data = download_receipt(payment_proof)
 
-                        if file_extension in ["png", "jpg", "jpeg"]:
+                            file_extension = payment_proof.split(".")[-1].lower()
 
-                            if payment_proof and os.path.exists(payment_proof):
-                                st.image(payment_proof, width=250)
+                            if file_extension in ["png", "jpg", "jpeg"]:
+
+                                st.image(receipt_data, width=250)
+
+                                mime_type = (
+                                    "image/jpeg" if file_extension in ["jpg", "jpeg"]
+                                    else "image/png"
+                                )
+
+                            elif file_extension == "pdf":
+
+                                st.write("PDF receipt uploaded.")
+                                mime_type = "application/pdf"
+
                             else:
-                                st.warning("Payment receipt image is unavailable.")
+                                mime_type = "application/octet-stream"
 
-                        elif file_extension == "pdf":
+                            st.download_button(
+                                label="📥 Download Receipt",
+                                data=receipt_data,
+                                file_name=os.path.basename(payment_proof),
+                                mime=mime_type,
+                                key=f"download_receipt_{participant_id}"
+                            )
 
-                            st.write("PDF receipt uploaded.")
+                        except Exception as e:
+                            st.warning(f"Unable to retrieve payment receipt: {e}")
 
-                        with open(payment_proof, "rb") as file:
-                            pdf_data = file.read()
-
-                        st.download_button(
-                            label="📥 Download Receipt",
-                            data=pdf_data,
-                            file_name=os.path.basename(payment_proof),
-                            mime="application/pdf",
-                            key=f"download_receipt_{participant_id}"
-                        )
                     else:
 
                         st.info("No payment receipt uploaded yet.")
+
                 with col2:
 
                     if payment_status == "Paid":
