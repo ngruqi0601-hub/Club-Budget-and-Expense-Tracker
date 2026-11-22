@@ -85,10 +85,6 @@ pending_expenses = [
     expense for expense in expenses
     if expense[6] == "Pending"
 ]
-st.write("Selected Club ID:", club_id)
-st.write("All Expenses:", expenses)
-st.write("Expense Statuses:", [repr(expense[6]) for expense in expenses])
-
 
 # --------------------------------
 # 6. Display Pending Expenses
