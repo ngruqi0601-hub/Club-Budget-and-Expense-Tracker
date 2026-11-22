@@ -72,7 +72,7 @@ with st.expander("Create Club"):
                 st.success("Club created successfully!")
                 st.write(f"**Invitation Code:** {invitation_code}")
 
-                st.rerun()
+            
 
             except Exception as e:
                 st.error(f"Unable to create club: {e}")
