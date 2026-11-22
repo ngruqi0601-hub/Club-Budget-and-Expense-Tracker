@@ -499,7 +499,10 @@ if programmes:
 
                         if file_extension in ["png", "jpg", "jpeg"]:
 
-                            st.image(payment_proof, width=250)
+                            if payment_proof and os.path.exists(payment_proof):
+                                st.image(payment_proof, width=250)
+                            else:
+                                st.warning("Payment receipt image is unavailable.")
 
                         elif file_extension == "pdf":
 

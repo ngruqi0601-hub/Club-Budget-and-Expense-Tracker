@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 from navigation import show_finance_sidebar
+from storage import get_supabase_client
 from database import (
     get_total_club_budget,
     get_total_club_expenses,
@@ -431,3 +432,9 @@ elif remaining_percentage <= 20:
 else:
 
     st.success("Budget Healthy")
+try:
+    supabase = get_supabase_client()
+    st.success("Connected to Supabase successfully!")
+
+except Exception as e:
+    st.error(f"Supabase connection failed: {e}")

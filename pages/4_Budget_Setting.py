@@ -129,10 +129,10 @@ if budgets:
         "Select Category to Update",
         existing_categories
     )
-    current_budget = next(
+    current_budget = float(next(
     row[2] for row in budgets
     if row[1] == selected_category
-)
+))
     st.write(f"Current Budget: RM {current_budget:.2f}")
     new_budget_limit = st.number_input(
         "Enter New Budget Limit (RM)",
@@ -183,7 +183,7 @@ category_totals = {}
 
 for expense in expenses:
     category_name = expense[3]
-    amount = expense[2]
+    amount = float(expense[2])
 
     if category_name not in category_totals:
         category_totals[category_name] = 0
@@ -193,7 +193,7 @@ if budgets:
     for budget in budgets:
         budget_id = budget[0]
         category_name = budget[1]
-        budget_limit = budget[2]
+        budget_limit = float(budget[2])
         actual_spending = category_totals.get(category_name, 0)
         remaining = budget_limit - actual_spending
         st.markdown(f"###{category_name}")
