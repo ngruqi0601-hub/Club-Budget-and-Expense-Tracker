@@ -36,7 +36,7 @@ if not st.session_state.get("logged_in", False):
     st.warning("Please log in first.")
     st.switch_page("pages/0_Account.py")
     st.stop()
-
+user_id = get_user_id(st.session_state.username)
 
 # ==================================
 # 4. PAGE TITLE and create club
