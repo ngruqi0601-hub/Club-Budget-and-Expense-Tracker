@@ -118,10 +118,15 @@ if st.button("Submit Budget", key="submit_budget"):
         success = add_budget(user_id, category, budget_limit)
 
         if success:
-            st.success(f"Budget for {category} submitted successfully!")
+            st.session_state.budget_added = category
             st.rerun()
         else:
             st.error("Unable to add budget. Please check the details or try again.")
+if st.session_state.get("budget_added"):
+    st.success(
+        f"Budget for {st.session_state.budget_added} submitted successfully!"
+    )
+    del st.session_state.budget_added
 st.subheader("Update Existing Budget")
 
 
