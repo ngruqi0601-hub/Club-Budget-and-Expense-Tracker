@@ -432,9 +432,5 @@ elif remaining_percentage <= 20:
 else:
 
     st.success("Budget Healthy")
-try:
-    supabase = get_supabase_client()
-    st.success("Connected to Supabase successfully!")
 
-except Exception as e:
-    st.error(f"Supabase connection failed: {e}")
+
