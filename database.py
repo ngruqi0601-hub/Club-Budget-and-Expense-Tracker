@@ -503,11 +503,18 @@ def add_expense(user_id, expense_name, amount, category):
 
 
 def add_budget(user_id, category, budget_limit):
-    get_supabase_client().table("budgets").insert({
-        "user_id": user_id,
-        "category": category,
-        "budget_limit": budget_limit
-    }).execute()
+    try:
+        response = get_supabase_client().table("budgets").insert({
+            "user_id": user_id,
+            "category": category,
+            "budget_limit": budget_limit
+        }).execute()
+
+        return bool(response.data)
+
+    except Exception as e:
+        print(f"Error adding personal budget: {e}")
+        return False
 
 
 def update_budget(user_id, category, budget_limit):

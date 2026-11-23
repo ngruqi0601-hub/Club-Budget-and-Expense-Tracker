@@ -113,11 +113,14 @@ if st.button("Submit Budget", key="submit_budget"):
     elif any(row[1] == category for row in get_budgets(user_id)):
         st.warning("A budget already exists for this category.")
 
-    else:
-        add_budget(user_id,category, budget_limit)
-        st.success(f"Budget for {category} submitted successfully!")
-        st.rerun()
-st.divider()
+   else:
+        success = add_budget(user_id, category, budget_limit)
+
+        if success:
+            st.success(f"Budget for {category} submitted successfully!")
+            st.rerun()
+        else:
+            st.error("Unable to add budget. Please check the details or try again.")
 st.subheader("Update Existing Budget")
 
 budgets = get_budgets(user_id)
