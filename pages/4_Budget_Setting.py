@@ -184,7 +184,7 @@ if budgets:
             success = delete_budget(user_id, delete_category)
 
             if success:
-                st.success(f"{delete_category} budget deleted successfully!")
+                st.session_state.budget_deleted = delete_category
                 st.rerun()
             else:
                 st.error("Unable to delete budget. Please try again.")
@@ -192,6 +192,11 @@ if budgets:
             st.warning("Please confirm before deleting.")
 else:
     st.info("No budgets available to delete.")
+if st.session_state.get("budget_deleted"):
+    st.success(
+        f"{st.session_state.budget_deleted} budget deleted successfully!"
+    )
+    del st.session_state.budget_deleted
 st.subheader("Budget Overview")
 
 budgets = get_budgets(user_id)
