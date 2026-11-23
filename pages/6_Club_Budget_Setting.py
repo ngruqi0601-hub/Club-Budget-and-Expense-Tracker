@@ -235,8 +235,10 @@ if budgets:
                     key=f"save_budget_{budget_id}"
                 ):
                     success = update_club_budget(
-                        budget_id, new_budget
-                    )
+                            club_id,
+                            category,
+                            new_budget
+                        )
 
                     if success:
                         st.success("Budget updated successfully!")
