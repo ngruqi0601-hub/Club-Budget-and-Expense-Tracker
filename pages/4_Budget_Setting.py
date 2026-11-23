@@ -106,11 +106,12 @@ budget_limit = st.number_input(
     min_value=0.0,
     step=10.0
 )
+budgets = get_budgets(user_id)
 if st.button("Submit Budget", key="submit_budget"):
     if budget_limit <= 0:
         st.warning("Please enter a valid budget limit.")
 
-    elif any(row[2] == category for row in get_budgets(user_id)):
+    elif any(row[2].strip().lower() == category.strip().lower() for row in budgets):
         st.warning("A budget already exists for this category.")
 
     else:
@@ -123,7 +124,6 @@ if st.button("Submit Budget", key="submit_budget"):
             st.error("Unable to add budget. Please check the details or try again.")
 st.subheader("Update Existing Budget")
 
-budgets = get_budgets(user_id)
 
 if budgets:
     existing_categories = [row[2] for row in budgets]
@@ -169,9 +169,10 @@ if budgets:
         [row[2] for row in budgets],
         key="delete_category"
     )
+
     confirm_delete = st.checkbox(
-    "I confirm that I want to delete this budget."
-)
+        "I confirm that I want to delete this budget."
+    )
 
     if st.button("Delete Budget", key="delete_budget"):
         if confirm_delete:
@@ -182,13 +183,10 @@ if budgets:
                 st.rerun()
             else:
                 st.error("Unable to delete budget. Please try again.")
-
         else:
             st.warning("Please confirm before deleting.")
-
-    else:
-        st.info("No budgets available to delete.")
-
+else:
+    st.info("No budgets available to delete.")
 st.subheader("Budget Overview")
 
 budgets = get_budgets(user_id)
