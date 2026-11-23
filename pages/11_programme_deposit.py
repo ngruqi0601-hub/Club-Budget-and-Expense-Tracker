@@ -87,15 +87,21 @@ if role == "Treasurer":
                 st.warning("Please enter a programme name.")
 
             else:
-                add_programme(
+                success = add_programme(
                     club_id,
                     programme_name.strip(),
                     deposit_amount,
                     int(participant_limit)
                 )
 
-                st.success("Programme created successfully!")
-                st.rerun()
+                if success:
+                    st.session_state.programme_created = True
+                    st.rerun()
+                else:
+                    st.error("Unable to create programme.")
+if st.session_state.get("programme_created", False):
+    st.success("Programme created successfully!")
+    st.session_state.programme_created = False
 #existing programmes
 st.subheader("📋 Existing Programmes")
 
