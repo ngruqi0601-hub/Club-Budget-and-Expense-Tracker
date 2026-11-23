@@ -528,11 +528,16 @@ def update_budget(user_id, category, budget_limit):
 
 
 def delete_budget(user_id, category):
-    get_supabase_client().table("budgets").delete().eq(
-        "user_id", user_id
-    ).eq(
-        "category", category
-    ).execute()
+    try:
+        response = get_supabase_client().table("budgets").delete().eq(
+            "user_id", user_id
+        ).eq("category", category).execute()
+
+        return bool(response.data)
+
+    except Exception as e:
+        print(f"Error deleting personal budget: {e}")
+        return False
 
 
 def get_budgets(user_id):
