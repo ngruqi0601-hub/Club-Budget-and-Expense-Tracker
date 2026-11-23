@@ -110,7 +110,7 @@ if st.button("Submit Budget", key="submit_budget"):
     if budget_limit <= 0:
         st.warning("Please enter a valid budget limit.")
 
-    elif any(row[1] == category for row in get_budgets(user_id)):
+    elif any(row[2] == category for row in get_budgets(user_id)):
         st.warning("A budget already exists for this category.")
 
     else:
@@ -126,7 +126,7 @@ st.subheader("Update Existing Budget")
 budgets = get_budgets(user_id)
 
 if budgets:
-    existing_categories = [row[1] for row in budgets]
+    existing_categories = [row[2] for row in budgets]
 
     selected_category = st.selectbox(
         "Select Category to Update",
@@ -135,9 +135,9 @@ if budgets:
     current_budget = 0.0
 
     for row in budgets:
-        if row[1] == selected_category:
+        if row[2] == selected_category:
             try:
-                current_budget = float(row[2])
+                current_budget = float(row[3])
             except (ValueError, TypeError):
                 current_budget = 0.0
             break
@@ -166,7 +166,7 @@ budgets = get_budgets(user_id)
 if budgets:
     delete_category = st.selectbox(
         "Select Category to Delete",
-        [row[1] for row in budgets],
+        [row[2] for row in budgets],
         key="delete_category"
     )
     confirm_delete = st.checkbox(
@@ -206,9 +206,9 @@ for expense in expenses:
 if budgets:
     for budget in budgets:
         budget_id = budget[0]
-        category_name = budget[1]
+        category_name = budget[2]
         try:
-            budget_limit = float(budget[2])
+            budget_limit = float(budget[3])
         except (ValueError, TypeError):
             st.warning(f"Invalid budget value for {category_name}. Please update this budget.")
             continue
