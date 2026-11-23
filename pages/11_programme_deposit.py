@@ -73,10 +73,10 @@ if role == "Treasurer":
         )
         participant_limit = st.number_input(
             "Maximum Number of Participants",
-            min_value=1,
-            value=50,
+            min_value=0,
+            value=0,
             step=5
-            )
+)
         submitted = st.form_submit_button(
             "Create Programme",
             use_container_width=True
@@ -86,6 +86,9 @@ if role == "Treasurer":
 
             if not programme_name.strip():
                 st.warning("Please enter a programme name.")
+
+            elif participant_limit <= 0:
+                st.warning("Please enter a valid participant limit.")
 
             else:
                 success = add_programme(
