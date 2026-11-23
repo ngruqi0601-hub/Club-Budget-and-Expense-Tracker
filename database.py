@@ -692,6 +692,17 @@ def delete_participant_payment_proof(participant_id, programme_id):
     ).select("id").execute()
 
     return bool(response.data)
+def delete_programme(programme_id):
+    try:
+        response = get_supabase_client().table("programmes").delete().eq(
+            "id", programme_id
+        ).execute()
+
+        return bool(response.data)
+
+    except Exception as e:
+        print(f"Error deleting programme: {e}")
+        return False
 
 
 # =========================================================

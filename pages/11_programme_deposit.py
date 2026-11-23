@@ -14,7 +14,8 @@ from database import (
     update_participant_payment_proof,
     update_programme,
     update_participant_details,
-    delete_participant_payment_proof
+    delete_participant_payment_proof,
+    delete_programme
 )
 
 from navigation import (
@@ -110,29 +111,52 @@ programmes = get_programmes(club_id)
 if programmes:
     for programme in programmes:
 
+        programme_id = programme[0]
+        programme_name = programme[1]
+
         with st.container(border=True):
-            st.write(f"**{programme[1]}**")
+
+            st.write(f"**{programme_name}**")
             st.write(f"Deposit: RM {programme[2]:.2f}")
 
             # Show participant limit and current registration
             participant_limit = programme[4]
-            participants = get_programme_participants(programme[0])
+            participants = get_programme_participants(programme_id)
 
             st.metric(
                 "Participants",
                 f"{len(participants)}/{participant_limit}"
             )
+
             if len(participants) >= participant_limit:
                 st.error("Registration Full")
             else:
                 st.success("Registration Open")
+
             st.write(
                 f"**Expected Total Deposit:** "
                 f"RM {len(participants) * programme[2]:.2f}"
-                )
+            )
+
+            # Delete programme
+            if role == "Treasurer":
+                if st.button(
+                    f"🗑️ Delete {programme_name}",
+                    key=f"delete_programme_{programme_id}"
+                ):
+                    success = delete_programme(programme_id)
+
+                    if success:
+                        st.session_state.programme_deleted = True
+                        st.rerun()
+                    else:
+                        st.error("Unable to delete programme.")
 
 else:
     st.info("No programmes created yet.")
+if st.session_state.get("programme_deleted", False):
+    st.success("Programme deleted successfully!")
+    st.session_state.programme_deleted = False
                
 
 
