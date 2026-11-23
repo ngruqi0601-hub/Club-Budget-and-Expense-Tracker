@@ -294,14 +294,28 @@ def get_club_expenses(club_id):
 
 
 def get_username(user_id):
-    response = get_supabase_client().table("users").select(
-        "username"
-    ).eq("id", user_id).limit(1).execute()
+    try:
+        if user_id is None:
+            return "Unknown"
 
-    if response.data:
-        return response.data[0]["username"]
-    return "Unknown User"
+        supabase = get_supabase_client()
 
+        response = (
+            supabase.table("users")
+            .select("username")
+            .eq("id", int(user_id))
+            .limit(1)
+            .execute()
+        )
+
+        if response.data:
+            return response.data[0]["username"]
+
+        return "Unknown"
+
+    except Exception as e:
+        print(f"Error getting username: {e}")
+        return "Unknown"
 
 def update_expense_status(
     expense_id,
