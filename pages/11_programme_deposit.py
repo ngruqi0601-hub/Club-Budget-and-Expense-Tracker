@@ -437,10 +437,16 @@ if programmes:
 
         df = pd.DataFrame(export_data)
 
-        df["Registered At"] = pd.to_datetime(
-            df["Registered At"]
-        ).dt.strftime("%d/%m/%Y %H:%M")
-
+        df["Registered At"] = (
+            pd.to_datetime(
+                df["Registered At"],
+                errors="coerce",
+                utc=True,
+                format="mixed"
+            )
+            .dt.tz_convert("Asia/Kuala_Lumpur")
+            .dt.strftime("%d/%m/%Y %H:%M")
+        )
         csv_data = df.to_csv(index=False).encode("utf-8")
 
         st.download_button(
