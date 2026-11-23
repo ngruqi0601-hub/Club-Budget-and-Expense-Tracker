@@ -113,7 +113,7 @@ if st.button("Submit Budget", key="submit_budget"):
     elif any(row[1] == category for row in get_budgets(user_id)):
         st.warning("A budget already exists for this category.")
 
-   else:
+    else:
         success = add_budget(user_id, category, budget_limit)
 
         if success:
