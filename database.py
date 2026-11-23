@@ -568,12 +568,19 @@ def migrate_personal_data(user_id):
 # =========================================================
 
 def add_programme(club_id, programme_name, deposit_amount, participant_limit):
-    get_supabase_client().table("programmes").insert({
-        "club_id": club_id,
-        "programme_name": programme_name,
-        "deposit_amount": deposit_amount,
-        "participant_limit": participant_limit
-    }).execute()
+    try:
+        response = get_supabase_client().table("programmes").insert({
+            "club_id": club_id,
+            "programme_name": programme_name,
+            "deposit_amount": deposit_amount,
+            "participant_limit": participant_limit
+        }).execute()
+
+        return bool(response.data)
+
+    except Exception as e:
+        print(f"Error creating programme: {e}")
+        return False
 
 
 def get_programmes(club_id):
