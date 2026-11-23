@@ -250,7 +250,7 @@ if budgets:
                 f"🗑️ Delete {category} Budget",
                 key=f"delete_budget_{budget_id}"
             ):
-                success = delete_club_budget(budget_id)
+                success = delete_club_budget(club_id, category)
 
                 if success:
                     st.success("Budget deleted successfully!")
