@@ -140,7 +140,7 @@ if budgets:
                 current_budget = float(row[2])
             except (ValueError, TypeError):
                 current_budget = 0.0
-        break
+            break
     st.write(f"Current Budget: RM {current_budget:.2f}")
     new_budget_limit = st.number_input(
         "Enter New Budget Limit (RM)",
@@ -174,14 +174,20 @@ if budgets:
 )
 
     if st.button("Delete Budget", key="delete_budget"):
-       if confirm_delete:
-          delete_budget(user_id,delete_category)
-          st.success(f"{delete_category} budget deleted successfully!")
-          st.rerun()
-       else:
-          st.warning("Please confirm before deleting.")
-else:
-    st.info("No budgets available to delete.")
+        if confirm_delete:
+            success = delete_budget(user_id, delete_category)
+
+            if success:
+                st.success(f"{delete_category} budget deleted successfully!")
+                st.rerun()
+            else:
+                st.error("Unable to delete budget. Please try again.")
+
+        else:
+            st.warning("Please confirm before deleting.")
+
+    else:
+        st.info("No budgets available to delete.")
 
 st.subheader("Budget Overview")
 
