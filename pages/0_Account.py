@@ -82,7 +82,7 @@ with login_tab:
         username = st.text_input("Enter your username")
         email = st.text_input("Enter your registered email")
 
-       if st.button("Continue"):
+        if st.button("Continue"):
 
             if not username.strip() or not email.strip():
                 st.warning("Please enter both username and email.")
