@@ -143,6 +143,9 @@ def get_user_club_role(user_id, club_id):
 def register_user(username, email, password):
     supabase = get_supabase_client()
 
+    username = username.strip()
+    email = email.strip().lower()
+
     password_hash = bcrypt.hashpw(
         password.encode("utf-8"),
         bcrypt.gensalt()
@@ -154,17 +157,21 @@ def register_user(username, email, password):
             "email": email,
             "password_hash": password_hash
         }).execute()
+
         return True
 
     except Exception as e:
         if _is_unique_violation(e):
             return False
+
         st.error(f"Registration failed: {e}")
         return False
 
 
 def login_user(username, password):
     try:
+        username = username.strip()
+
         response = get_supabase_client().table("users").select(
             "password_hash"
         ).eq("username", username).limit(1).execute()
@@ -173,10 +180,14 @@ def login_user(username, password):
             return False
 
         stored_hash = response.data[0]["password_hash"]
+
         if isinstance(stored_hash, str):
             stored_hash = stored_hash.encode("utf-8")
 
-        return bcrypt.checkpw(password.encode("utf-8"), stored_hash)
+        return bcrypt.checkpw(
+            password.encode("utf-8"),
+            stored_hash
+        )
 
     except Exception as e:
         st.error(f"Login failed: {e}")
@@ -416,6 +427,9 @@ def delete_club_budget(club_id, category):
 # =========================================================
 
 def check_account_exists(username, email):
+    username = username.strip()
+    email = email.strip().lower()
+
     response = get_supabase_client().table("users").select(
         "id"
     ).eq(
