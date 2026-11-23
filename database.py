@@ -415,15 +415,19 @@ def delete_club_budget(club_id, category):
 # PASSWORD RESET
 # =========================================================
 
-def check_email_exists(email):
+def check_account_exists(username, email):
     response = get_supabase_client().table("users").select(
         "id"
-    ).eq("email", email).limit(1).execute()
+    ).eq(
+        "username", username
+    ).eq(
+        "email", email
+    ).limit(1).execute()
 
     return bool(response.data)
 
 
-def reset_password(email, new_password):
+def reset_password(username, email, new_password):
     password_hash = bcrypt.hashpw(
         new_password.encode("utf-8"),
         bcrypt.gensalt()
@@ -432,6 +436,8 @@ def reset_password(email, new_password):
     response = get_supabase_client().table("users").update({
         "password_hash": password_hash
     }).eq(
+        "username", username
+    ).eq(
         "email", email
     ).select("id").execute()
 

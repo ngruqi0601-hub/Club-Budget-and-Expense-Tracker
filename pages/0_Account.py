@@ -1,5 +1,5 @@
 import streamlit as st
-from database import register_user, login_user, check_email_exists, get_user_id,migrate_personal_data,send_verification_email,reset_password
+from database import register_user, login_user, check_account_exists, get_user_id,send_verification_email,reset_password
 import secrets
 import time
 
@@ -79,14 +79,15 @@ with login_tab:
 
         st.subheader("Reset Password")
 
+        username = st.text_input("Enter your username")
         email = st.text_input("Enter your registered email")
 
-        if st.button("Continue"):
+       if st.button("Continue"):
 
-            if not email.strip():
-                st.warning("Please enter your email address.")
+            if not username.strip() or not email.strip():
+                st.warning("Please enter both username and email.")
 
-            elif check_email_exists(email.strip()):
+            elif check_account_exists(username.strip(), email.strip()):
 
                 verification_code = str(
                     secrets.randbelow(900000) + 100000
@@ -100,9 +101,8 @@ with login_tab:
 
                     st.session_state.verification_code = verification_code
                     st.session_state.verification_email = email.strip()
+                    st.session_state.verification_username = username.strip()
                     st.session_state.code_expiry = time.time() + 300
-
-                    # Reset previous verification status
                     st.session_state.code_verified = False
 
                     st.success("Verification code sent to your email!")
@@ -111,7 +111,7 @@ with login_tab:
                     st.error(f"Unable to send email: {e}")
 
             else:
-                st.error("This email is not registered.")
+                st.error("Username and email do not match any registered account.")
 
         # Verify Code Section
         if "verification_code" in st.session_state:
@@ -170,6 +170,7 @@ with login_tab:
 
                 else:
                     success = reset_password(
+                        st.session_state.verification_username,
                         st.session_state.verification_email,
                         new_password
                     )
@@ -193,6 +194,7 @@ with login_tab:
             st.session_state.forgot_password = False
 
             st.session_state.pop("verification_code", None)
+            st.session_state.pop("verification_username", None)
             st.session_state.pop("verification_email", None)
             st.session_state.pop("code_expiry", None)
             st.session_state.pop("code_verified", None)
