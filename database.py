@@ -1,200 +1,237 @@
-import sqlite3
 import bcrypt
 import secrets
 import smtplib
 import streamlit as st
 from email.message import EmailMessage
-def generate_invitation_code():
-    return secrets.token_hex(4).upper()
-def create_club(club_name, user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+from supabase import create_client
 
-    invitation_code = generate_invitation_code()
 
-    cursor.execute("""
-        INSERT INTO clubs (club_name, invitation_code, created_by)
-        VALUES (?, ?, ?)
-    """, (club_name, invitation_code, user_id))
+# =========================================================
+# SUPABASE CONNECTION
+# =========================================================
 
-    club_id = cursor.lastrowid
-
-    cursor.execute("""
-        INSERT INTO memberships (user_id, club_id, role)
-        VALUES (?, ?, ?)
-    """, (user_id, club_id, "Treasurer"))
-
-    conn.commit()
-    conn.close()
-    return club_id, invitation_code
-
-def join_club(invitation_code, user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    try:
-        # Find the club using its invitation code
-        cursor.execute("""
-            SELECT id
-            FROM clubs
-            WHERE invitation_code = ?
-        """, (invitation_code.strip().upper(),))
-
-        club = cursor.fetchone()
-
-        # Check whether the invitation code exists
-        if club is None:
-            return "invalid"
-
-        club_id = club[0]
-
-        # Add the user as a club member
-        cursor.execute("""
-            INSERT INTO memberships (user_id, club_id, role)
-            VALUES (?, ?, ?)
-        """, (user_id, club_id, "Member"))
-
-        conn.commit()
-        return "success"
-
-    except sqlite3.IntegrityError:
-        return "already_joined"
-
-    finally:
-        conn.close()
-def get_user_clubs(user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT clubs.id, clubs.club_name, memberships.role
-        FROM memberships
-        JOIN clubs ON memberships.club_id = clubs.id
-        WHERE memberships.user_id = ?
-    """, (user_id,))
-
-    clubs = cursor.fetchall()
-    conn.close()
-
-    return clubs
-def get_user_club_role(user_id, club_id):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT role
-        FROM memberships
-        WHERE user_id = ? AND club_id = ?
-    """, (user_id, club_id))
-
-    result = cursor.fetchone()
-    conn.close()
-
-    if result:
-        return result[0]
-
-    return None
-def register_user(username, email, password):
-    conn = create_connection()
-    cursor = conn.cursor()
-    try:
-        password_hash = bcrypt.hashpw(
-            password.encode("utf-8"),
-            bcrypt.gensalt()
-        ).decode("utf-8")
-
-        cursor.execute("""
-            INSERT INTO users (username, email, password_hash)
-            VALUES (?, ?, ?)
-        """, (username, email, password_hash))
-
-        conn.commit()
-        return True
-
-    except sqlite3.IntegrityError:
-        return False
-
-    finally:
-        conn.close()
-def login_user(username, password):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT password_hash FROM users WHERE username = ?",
-        (username,)
+def get_supabase_client():
+    return create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"]
     )
 
-    result = cursor.fetchone()
 
-    conn.close()
+def _is_unique_violation(error):
+    return getattr(error, "code", None) == "23505"
 
-    if result:
-        stored_hash = result[0]
 
+def _as_tuples(rows, columns):
+    """Convert Supabase dictionaries to the tuple format used by existing pages."""
+    return [tuple(row.get(column) for column in columns) for row in rows]
+
+
+# =========================================================
+# GENERAL HELPERS
+# =========================================================
+
+def generate_invitation_code():
+    return secrets.token_hex(4).upper()
+
+
+# =========================================================
+# CLUB CREATION AND MEMBERSHIP
+# =========================================================
+
+def create_club(club_name, user_id):
+    supabase = get_supabase_client()
+    invitation_code = generate_invitation_code()
+
+    try:
+        club_response = supabase.table("clubs").insert({
+            "club_name": club_name,
+            "invitation_code": invitation_code,
+            "created_by": user_id
+        }).select("id").execute()
+
+        club_id = club_response.data[0]["id"]
+
+        try:
+            supabase.table("memberships").insert({
+                "user_id": user_id,
+                "club_id": club_id,
+                "role": "Treasurer"
+            }).execute()
+        except Exception:
+            # Avoid leaving a club without its creator membership.
+            supabase.table("clubs").delete().eq("id", club_id).execute()
+            raise
+
+        return club_id, invitation_code
+
+    except Exception as e:
+        st.error(f"Unable to create club: {e}")
+        return None, None
+
+
+def join_club(invitation_code, user_id):
+    supabase = get_supabase_client()
+
+    try:
+        response = supabase.table("clubs").select(
+            "id"
+        ).eq(
+            "invitation_code", invitation_code.strip().upper()
+        ).limit(1).execute()
+
+        if not response.data:
+            return "invalid"
+
+        club_id = response.data[0]["id"]
+
+        supabase.table("memberships").insert({
+            "user_id": user_id,
+            "club_id": club_id,
+            "role": "Member"
+        }).execute()
+
+        return "success"
+
+    except Exception as e:
+        if _is_unique_violation(e):
+            return "already_joined"
+        st.error(f"Unable to join club: {e}")
+        return "error"
+
+
+def get_user_clubs(user_id):
+    supabase = get_supabase_client()
+
+    memberships = supabase.table("memberships").select(
+        "club_id, role"
+    ).eq("user_id", user_id).execute().data
+
+    if not memberships:
+        return []
+
+    club_ids = [item["club_id"] for item in memberships]
+
+    club_rows = supabase.table("clubs").select(
+        "id, club_name"
+    ).in_("id", club_ids).execute().data
+
+    club_names = {item["id"]: item["club_name"] for item in club_rows}
+
+    return [
+        (item["club_id"], club_names[item["club_id"]], item["role"])
+        for item in memberships
+        if item["club_id"] in club_names
+    ]
+
+
+def get_user_club_role(user_id, club_id):
+    response = get_supabase_client().table("memberships").select(
+        "role"
+    ).eq(
+        "user_id", user_id
+    ).eq(
+        "club_id", club_id
+    ).limit(1).execute()
+
+    return response.data[0]["role"] if response.data else None
+
+
+# =========================================================
+# USER REGISTRATION AND LOGIN
+# =========================================================
+
+def register_user(username, email, password):
+    supabase = get_supabase_client()
+
+    password_hash = bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt()
+    ).decode("utf-8")
+
+    try:
+        supabase.table("users").insert({
+            "username": username,
+            "email": email,
+            "password_hash": password_hash
+        }).execute()
+        return True
+
+    except Exception as e:
+        if _is_unique_violation(e):
+            return False
+        st.error(f"Registration failed: {e}")
+        return False
+
+
+def login_user(username, password):
+    try:
+        response = get_supabase_client().table("users").select(
+            "password_hash"
+        ).eq("username", username).limit(1).execute()
+
+        if not response.data:
+            return False
+
+        stored_hash = response.data[0]["password_hash"]
         if isinstance(stored_hash, str):
             stored_hash = stored_hash.encode("utf-8")
 
-        if bcrypt.checkpw(
-            password.encode("utf-8"),
-            stored_hash
-        ):
-            return True
+        return bcrypt.checkpw(password.encode("utf-8"), stored_hash)
 
-    return False
+    except Exception as e:
+        st.error(f"Login failed: {e}")
+        return False
+
+
+# =========================================================
+# CLUB DASHBOARD TOTALS
+# =========================================================
+
 def get_total_club_budget(club_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    rows = get_supabase_client().table("club_budgets").select(
+        "budget_limit"
+    ).eq("club_id", club_id).execute().data
 
-    cursor.execute("""
-        SELECT SUM(budget_limit)
-        FROM club_budgets
-        WHERE club_id = ?
-    """, (club_id,))
+    return sum(float(row["budget_limit"] or 0) for row in rows)
 
-    result = cursor.fetchone()
-    conn.close()
 
-    return result[0] if result[0] is not None else 0
 def get_total_club_expenses(club_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    rows = get_supabase_client().table("club_expenses").select(
+        "amount"
+    ).eq(
+        "club_id", club_id
+    ).eq(
+        "status", "Approved"
+    ).execute().data
 
-    cursor.execute("""
-        SELECT SUM(amount)
-        FROM club_expenses
-        WHERE club_id = ?
-          AND status = 'Approved'
-    """, (club_id,))
+    return sum(float(row["amount"] or 0) for row in rows)
 
-    result = cursor.fetchone()
-    conn.close()
 
-    return result[0] if result[0] is not None else 0
 def get_category_expense_totals(club_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    rows = get_supabase_client().table("club_expenses").select(
+        "category, amount"
+    ).eq(
+        "club_id", club_id
+    ).eq(
+        "status", "Approved"
+    ).execute().data
 
-    cursor.execute("""
-        SELECT category, SUM(amount)
-        FROM club_expenses
-        WHERE club_id = ?
-          AND status = 'Approved'
-        GROUP BY category
-    """, (club_id,))
+    totals = {}
+    for row in rows:
+        category = row["category"]
+        totals[category] = totals.get(category, 0) + float(row["amount"] or 0)
 
-    expenses = cursor.fetchall()
-    conn.close()
+    return [(category, amount) for category, amount in totals.items()]
 
-    return expenses
 
 def get_remaining_club_budget(club_id):
-    total_budget = get_total_club_budget(club_id) or 0
-    total_expenses = get_total_club_expenses(club_id) or 0
+    return get_total_club_budget(club_id) - get_total_club_expenses(club_id)
 
-    remaining = total_budget - total_expenses
 
-    return remaining
+# =========================================================
+# CLUB EXPENSES
+# =========================================================
+
 def add_club_expense(
     club_id,
     user_id,
@@ -204,79 +241,68 @@ def add_club_expense(
     receipt_path,
     description=None
 ):
-    conn = create_connection()
-    cursor = conn.cursor()
+    get_supabase_client().table("club_expenses").insert({
+        "club_id": club_id,
+        "submitted_by": user_id,
+        "expense_name": expense_name,
+        "amount": amount,
+        "category": category,
+        "receipt_path": receipt_path,
+        "description": description,
+        "status": "Pending"
+    }).execute()
 
-    cursor.execute("""
-        INSERT INTO club_expenses (
-            club_id,
-            submitted_by,
-            expense_name,
-            amount,
-            category,
-            receipt_path,
-            description,
-            status,
-            created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', CURRENT_TIMESTAMP)
-    """, (
-        club_id,
-        user_id,
-        expense_name,
-        amount,
-        category,
-        receipt_path,
-        description
-    ))
 
-    conn.commit()
-    conn.close()
 def get_club_expenses(club_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    supabase = get_supabase_client()
 
-    cursor.execute("""
-        SELECT
-            club_expenses.id,
-            club_expenses.expense_name,
-            club_expenses.amount,
-            club_expenses.category,
-            users.username,
-            club_expenses.receipt_path,
-            club_expenses.status,
-            club_expenses.created_at,
-            club_expenses.description,
-            club_expenses.treasurer_remarks
-        FROM club_expenses
-        JOIN users
-        ON club_expenses.submitted_by = users.id
-        WHERE club_expenses.club_id = ?
-        ORDER BY club_expenses.created_at DESC
-    """, (club_id,))
+    expenses = supabase.table("club_expenses").select(
+        "id, expense_name, amount, category, submitted_by, receipt_path, "
+        "status, created_at, description, treasurer_remarks"
+    ).eq(
+        "club_id", club_id
+    ).order(
+        "created_at", desc=True
+    ).execute().data
 
-    expenses = cursor.fetchall()
-    conn.close()
+    if not expenses:
+        return []
 
-    return expenses
+    user_ids = list({row["submitted_by"] for row in expenses})
+    users = supabase.table("users").select(
+        "id, username"
+    ).in_("id", user_ids).execute().data
+
+    usernames = {row["id"]: row["username"] for row in users}
+
+    # Preserve the original 10-column tuple order expected by the pages.
+    return [
+        (
+            row["id"],
+            row["expense_name"],
+            row["amount"],
+            row["category"],
+            usernames.get(row["submitted_by"], "Unknown User"),
+            row["receipt_path"],
+            row["status"],
+            row["created_at"],
+            row["description"],
+            row["treasurer_remarks"]
+        )
+        for row in expenses
+    ]
+
+
 def get_username(user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    response = get_supabase_client().table("users").select(
+        "username"
+    ).eq("id", user_id).limit(1).execute()
 
-    cursor.execute("""
-        SELECT username
-        FROM users
-        WHERE id = ?
-    """, (user_id,))
-
-    result = cursor.fetchone()
-
-    conn.close()
-
-    if result:
-        return result[0]
-
+    if response.data:
+        return response.data[0]["username"]
     return "Unknown User"
+
+
 def update_expense_status(
     expense_id,
     club_id,
@@ -284,284 +310,122 @@ def update_expense_status(
     status,
     treasurer_remarks=None
 ):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("""
-            SELECT role
-            FROM memberships
-            WHERE user_id = ? AND club_id = ?
-        """, (user_id, club_id))
-
-        result = cursor.fetchone()
-
-        if result is None or result[0] != "Treasurer":
-            return False
-
-        if status not in ["Approved", "Rejected"]:
-            return False
-
-        cursor.execute("""
-            UPDATE club_expenses
-            SET status = ?, treasurer_remarks = ?
-            WHERE id = ? AND club_id = ? AND status = 'Pending'
-        """, (
-            status,
-            treasurer_remarks,
-            expense_id,
-            club_id
-        ))
-
-        conn.commit()
-
-        return cursor.rowcount > 0
-
-    finally:
-        conn.close()
-def get_user_id(username):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT id
-        FROM users
-        WHERE username = ?
-    """, (username,))
-
-    result = cursor.fetchone()
-
-    conn.close()
-
-    if result:
-        return result[0]
-
-    return None
-
-def add_club_budget(club_id, category, budget_limit):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("""
-            INSERT INTO club_budgets (club_id, category, budget_limit)
-            VALUES (?, ?, ?)
-        """, (club_id, category, budget_limit))
-
-        conn.commit()
-        return True
-
-    except sqlite3.IntegrityError:
+    if status not in ["Approved", "Rejected"]:
         return False
 
-    finally:
-        conn.close()
+    supabase = get_supabase_client()
+
+    membership = supabase.table("memberships").select(
+        "role"
+    ).eq(
+        "user_id", user_id
+    ).eq(
+        "club_id", club_id
+    ).limit(1).execute().data
+
+    if not membership or membership[0]["role"] != "Treasurer":
+        return False
+
+    response = supabase.table("club_expenses").update({
+        "status": status,
+        "treasurer_remarks": treasurer_remarks
+    }).eq(
+        "id", expense_id
+    ).eq(
+        "club_id", club_id
+    ).eq(
+        "status", "Pending"
+    ).select("id").execute()
+
+    return bool(response.data)
+
+
+def get_user_id(username):
+    response = get_supabase_client().table("users").select(
+        "id"
+    ).eq("username", username).limit(1).execute()
+
+    return response.data[0]["id"] if response.data else None
+
+
+# =========================================================
+# CLUB BUDGETS
+# =========================================================
+
+def add_club_budget(club_id, category, budget_limit):
+    try:
+        get_supabase_client().table("club_budgets").insert({
+            "club_id": club_id,
+            "category": category,
+            "budget_limit": budget_limit
+        }).execute()
+        return True
+    except Exception as e:
+        if _is_unique_violation(e):
+            return False
+        st.error(f"Unable to add club budget: {e}")
+        return False
+
 
 def get_club_budgets(club_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    rows = get_supabase_client().table("club_budgets").select(
+        "id, category, budget_limit"
+    ).eq("club_id", club_id).execute().data
 
-    cursor.execute("""
-        SELECT id, category, budget_limit
-        FROM club_budgets
-        WHERE club_id = ?
-    """, (club_id,))
+    return _as_tuples(rows, ["id", "category", "budget_limit"])
 
-    budgets = cursor.fetchall()
-
-    conn.close()
-
-    return budgets
 
 def update_club_budget(club_id, category, new_budget_limit):
-    conn = create_connection()
-    cursor = conn.cursor()
+    response = get_supabase_client().table("club_budgets").update({
+        "budget_limit": new_budget_limit
+    }).eq(
+        "club_id", club_id
+    ).eq(
+        "category", category
+    ).select("id").execute()
 
-    cursor.execute("""
-        UPDATE club_budgets
-        SET budget_limit = ?
-        WHERE club_id = ? AND category = ?
-    """, (new_budget_limit, club_id, category))
+    return bool(response.data)
 
-    conn.commit()
-
-    updated = cursor.rowcount > 0
-
-    conn.close()
-
-    return updated
 
 def delete_club_budget(club_id, category):
-    conn = create_connection()
-    cursor = conn.cursor()
+    response = get_supabase_client().table("club_budgets").delete().eq(
+        "club_id", club_id
+    ).eq(
+        "category", category
+    ).select("id").execute()
 
-    cursor.execute("""
-        DELETE FROM club_budgets
-        WHERE club_id = ? AND category = ?
-    """, (club_id, category))
+    return bool(response.data)
 
-    conn.commit()
 
-    deleted = cursor.rowcount > 0
+# =========================================================
+# PASSWORD RESET
+# =========================================================
 
-    conn.close()
-
-    return deleted
-
-def create_connection():
-    conn = sqlite3.connect("club_budget.db")
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
-    
-def update_club_expenses_table():
-
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("PRAGMA table_info(club_expenses)")
-
-    columns = [column[1] for column in cursor.fetchall()]
-
-    if "description" not in columns:
-        cursor.execute("""
-            ALTER TABLE club_expenses
-            ADD COLUMN description TEXT
-        """)
-
-    if "treasurer_remarks" not in columns:
-        cursor.execute("""
-            ALTER TABLE club_expenses
-            ADD COLUMN treasurer_remarks TEXT
-        """)
-
-    conn.commit()
-    conn.close()
-
-    
-def create_table():
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            expense_name TEXT NOT NULL,
-            amount REAL NOT NULL,
-            category TEXT NOT NULL
-        )
-    """)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS budgets (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category TEXT NOT NULL UNIQUE,
-        budget_limit REAL NOT NULL
-    )
-""")
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        email TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL
-    )
-""")
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS clubs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        club_name TEXT NOT NULL,
-        invitation_code TEXT NOT NULL UNIQUE,
-        created_by INTEGER NOT NULL,
-        FOREIGN KEY (created_by) REFERENCES users(id)
-    )
-""")
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS memberships (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        club_id INTEGER NOT NULL,
-        role TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (club_id) REFERENCES clubs(id),
-        UNIQUE(user_id, club_id)
-    )
-""")
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS club_expenses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            club_id INTEGER NOT NULL,
-            submitted_by INTEGER NOT NULL,
-            expense_name TEXT NOT NULL,
-            amount REAL NOT NULL,
-            category TEXT NOT NULL,
-            receipt_path TEXT,
-            status TEXT NOT NULL DEFAULT 'Pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            description TEXT,
-            treasurer_remarks TEXT,
-
-            FOREIGN KEY (club_id) REFERENCES clubs(id),
-            FOREIGN KEY (submitted_by) REFERENCES users(id)
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS club_budgets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            club_id INTEGER NOT NULL,
-            category TEXT NOT NULL,
-            budget_limit REAL NOT NULL,
-
-            FOREIGN KEY (club_id) REFERENCES clubs(id),
-            UNIQUE (club_id, category)
-        )
-    """)
-
-    conn.commit()
-    conn.close()
-
-#reset password feature
 def check_email_exists(email):
-    conn = create_connection()
-    cursor = conn.cursor()
+    response = get_supabase_client().table("users").select(
+        "id"
+    ).eq("email", email).limit(1).execute()
 
-    cursor.execute("""
-        SELECT id
-        FROM users
-        WHERE email = ?
-    """, (email,))
+    return bool(response.data)
 
-    result = cursor.fetchone()
 
-    conn.close()
-
-    return result is not None
 def reset_password(email, new_password):
-    conn = create_connection()
-    cursor = conn.cursor()
-
     password_hash = bcrypt.hashpw(
         new_password.encode("utf-8"),
         bcrypt.gensalt()
     ).decode("utf-8")
 
-    cursor.execute("""
-        UPDATE users
-        SET password_hash = ?
-        WHERE email = ?
-    """, (password_hash, email))
+    response = get_supabase_client().table("users").update({
+        "password_hash": password_hash
+    }).eq(
+        "email", email
+    ).select("id").execute()
 
-    conn.commit()
+    return bool(response.data)
 
-    updated = cursor.rowcount > 0
 
-    conn.close()
-
-    return updated
 def send_verification_email(receiver_email, verification_code):
-
     message = EmailMessage()
-
     message["Subject"] = "Password Reset Verification Code"
     message["From"] = st.secrets["email"]["sender"]
     message["To"] = receiver_email
@@ -587,454 +451,237 @@ Thank you.
         server.login(
             st.secrets["email"]["sender"],
             st.secrets["email"]["app_password"]
-            )
+        )
         server.send_message(message)
 
 
-
-
-
-        
-
-
-# ==============================
-# PERSONAL FINANCE FUNCTIONS
-# ==============================
+# =========================================================
+# PERSONAL FINANCE
+# =========================================================
 
 def add_expense(user_id, expense_name, amount, category):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO expenses (user_id, expense_name, amount, category)
-        VALUES (?, ?, ?, ?)
-    """, (user_id, expense_name, amount, category))
-
-    conn.commit()
-    conn.close()
+    get_supabase_client().table("expenses").insert({
+        "user_id": user_id,
+        "expense_name": expense_name,
+        "amount": amount,
+        "category": category
+    }).execute()
 
 
 def add_budget(user_id, category, budget_limit):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO budgets (user_id, category, budget_limit)
-        VALUES (?, ?, ?)
-    """, (user_id, category, budget_limit))
-
-    conn.commit()
-    conn.close()
+    get_supabase_client().table("budgets").insert({
+        "user_id": user_id,
+        "category": category,
+        "budget_limit": budget_limit
+    }).execute()
 
 
 def update_budget(user_id, category, budget_limit):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE budgets
-        SET budget_limit = ?
-        WHERE user_id = ? AND category = ?
-    """, (budget_limit, user_id, category))
-
-    conn.commit()
-    conn.close()
+    get_supabase_client().table("budgets").update({
+        "budget_limit": budget_limit
+    }).eq(
+        "user_id", user_id
+    ).eq(
+        "category", category
+    ).execute()
 
 
 def delete_budget(user_id, category):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        DELETE FROM budgets
-        WHERE user_id = ? AND category = ?
-    """, (user_id, category))
-
-    conn.commit()
-    conn.close()
+    get_supabase_client().table("budgets").delete().eq(
+        "user_id", user_id
+    ).eq(
+        "category", category
+    ).execute()
 
 
 def get_budgets(user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    rows = get_supabase_client().table("budgets").select(
+        "id, user_id, category, budget_limit"
+    ).eq("user_id", user_id).execute().data
 
-    cursor.execute("""
-        SELECT * FROM budgets
-        WHERE user_id = ?
-    """, (user_id,))
-
-    budgets = cursor.fetchall()
-    conn.close()
-
-    return budgets
+    # Match the old SQLite SELECT * column order.
+    return _as_tuples(rows, ["id", "user_id", "category", "budget_limit"])
 
 
 def get_expenses(user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    rows = get_supabase_client().table("expenses").select(
+        "id, expense_name, amount, category, user_id"
+    ).eq("user_id", user_id).execute().data
 
-    cursor.execute("""
-        SELECT * FROM expenses
-        WHERE user_id = ?
-    """, (user_id,))
-
-    expenses = cursor.fetchall()
-    conn.close()
-
-    return expenses
+    # Match the old SQLite SELECT * column order.
+    return _as_tuples(rows, ["id", "expense_name", "amount", "category", "user_id"])
 
 
 def delete_expense(expense_id, user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        DELETE FROM expenses
-        WHERE id = ? AND user_id = ?
-    """, (expense_id, user_id))
-
-    conn.commit()
-    conn.close()
-
-
+    get_supabase_client().table("expenses").delete().eq(
+        "id", expense_id
+    ).eq(
+        "user_id", user_id
+    ).execute()
 
 
 def migrate_personal_data(user_id):
-    conn = create_connection()
-    cursor = conn.cursor()
+    """
+    Kept for compatibility with any old page imports.
+    Personal records are already assigned to user_id in Supabase,
+    so no schema migration is needed here.
+    """
+    return True
 
-    try:
-        # Check whether expenses already has a user_id column
-        cursor.execute("PRAGMA table_info(expenses)")
-        expense_columns = [column[1] for column in cursor.fetchall()]
 
-        if "user_id" not in expense_columns:
-            cursor.execute("""
-                ALTER TABLE expenses
-                ADD COLUMN user_id INTEGER REFERENCES users(id)
-            """)
+# =========================================================
+# PROGRAMMES AND DEPOSIT MANAGEMENT
+# =========================================================
 
-        # Check whether budgets already has a user_id column
-        cursor.execute("PRAGMA table_info(budgets)")
-        budget_columns = [column[1] for column in cursor.fetchall()]
-
-        if "user_id" not in budget_columns:
-            # Rebuild budgets to allow the same category
-            # for different users
-            cursor.execute("""
-                ALTER TABLE budgets RENAME TO budgets_old
-            """)
-
-            cursor.execute("""
-                CREATE TABLE budgets (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    category TEXT NOT NULL,
-                    budget_limit REAL NOT NULL,
-                    FOREIGN KEY (user_id) REFERENCES users(id),
-                    UNIQUE(user_id, category)
-                )
-            """)
-
-            cursor.execute("""
-                INSERT INTO budgets (id, user_id, category, budget_limit)
-                SELECT id, NULL, category, budget_limit
-                FROM budgets_old
-            """)
-
-            cursor.execute("DROP TABLE budgets_old")
-
-        # Assign existing personal records to this account
-        cursor.execute("""
-            UPDATE expenses
-            SET user_id = ?
-            WHERE user_id IS NULL
-        """, (user_id,))
-
-        cursor.execute("""
-            UPDATE budgets
-            SET user_id = ?
-            WHERE user_id IS NULL
-        """, (user_id,))
-
-        conn.commit()
-
-    except Exception:
-        conn.rollback()
-        raise
-
-    finally:
-        conn.close()
-        
-#programme
-
-def create_programmes_table():
-
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS programmes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            club_id INTEGER NOT NULL,
-            programme_name TEXT NOT NULL,
-            deposit_amount REAL NOT NULL,
-            participant_limit integer NOT NULL DEFAULT 50,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (club_id) REFERENCES clubs(id)
-        )
-    """)
-
-    conn.commit()
-    conn.close()
-
-def add_programme(
-    club_id,
-    programme_name,
-    deposit_amount,
-    participant_limit
-):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO programmes (
-            club_id,
-            programme_name,
-            deposit_amount,
-            participant_limit
-        )
-        VALUES (?, ?, ?, ?)
-    """, (
-        club_id,
-        programme_name,
-        deposit_amount,
-        participant_limit
-    ))
-
-    conn.commit()
-    conn.close()
+def add_programme(club_id, programme_name, deposit_amount, participant_limit):
+    get_supabase_client().table("programmes").insert({
+        "club_id": club_id,
+        "programme_name": programme_name,
+        "deposit_amount": deposit_amount,
+        "participant_limit": participant_limit
+    }).execute()
 
 
 def get_programmes(club_id):
+    rows = get_supabase_client().table("programmes").select(
+        "id, programme_name, deposit_amount, created_at, participant_limit"
+    ).eq(
+        "club_id", club_id
+    ).order(
+        "created_at", desc=True
+    ).execute().data
 
-    conn = create_connection()
-    cursor = conn.cursor()
+    return _as_tuples(
+        rows,
+        ["id", "programme_name", "deposit_amount", "created_at", "participant_limit"]
+    )
 
-    cursor.execute("""
-       SELECT
-       id,
-       programme_name,
-       deposit_amount,
-       created_at,
-       participant_limit,
-       FROM programmes
-       WHERE club_id = ?
-       ORDER BY created_at DESC
-    """, (club_id,))
 
-    programmes = cursor.fetchall()
+def add_programme_participant(programme_id, participant_name, participant_email):
+    get_supabase_client().table("programme_participants").insert({
+        "programme_id": programme_id,
+        "participant_name": participant_name,
+        "participant_email": participant_email
+    }).execute()
 
-    conn.close()
 
-    return programmes
-def get_programmes(club_id):
+def get_programme_participants(programme_id):
+    rows = get_supabase_client().table("programme_participants").select(
+        "id, participant_name, participant_email, payment_status, "
+        "payment_proof, registered_at"
+    ).eq(
+        "programme_id", programme_id
+    ).order(
+        "registered_at", desc=True
+    ).execute().data
 
-    conn = create_connection()
-    cursor = conn.cursor()
+    return _as_tuples(
+        rows,
+        [
+            "id",
+            "participant_name",
+            "participant_email",
+            "payment_status",
+            "payment_proof",
+            "registered_at"
+        ]
+    )
 
-    cursor.execute("""
-        SELECT
-            id,
-            programme_name,
-            deposit_amount,
-            created_at,
-            participant_limit
-        FROM programmes
-        WHERE club_id = ?
-        ORDER BY created_at DESC
-    """, (club_id,))
 
-    programmes = cursor.fetchall()
+def update_participant_payment_status(participant_id, programme_id, payment_status):
+    response = get_supabase_client().table("programme_participants").update({
+        "payment_status": payment_status
+    }).eq(
+        "id", participant_id
+    ).eq(
+        "programme_id", programme_id
+    ).select("id").execute()
 
-    conn.close()
+    return bool(response.data)
 
-    return programmes
 
-def create_participants_table():
+def update_participant_payment_proof(participant_id, programme_id, payment_proof):
+    response = get_supabase_client().table("programme_participants").update({
+        "payment_proof": payment_proof
+    }).eq(
+        "id", participant_id
+    ).eq(
+        "programme_id", programme_id
+    ).select("id").execute()
 
-    conn = create_connection()
-    cursor = conn.cursor()
+    return bool(response.data)
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS programme_participants (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            programme_id INTEGER NOT NULL,
-            participant_name TEXT NOT NULL,
-            participant_email TEXT,
-            payment_status TEXT NOT NULL DEFAULT 'Unpaid',
-            payment_proof TEXT,
-            registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (programme_id) REFERENCES programmes(id)
-        )
-    """)
 
-    conn.commit()
-    conn.close()
+def update_programme(programme_id, deposit_amount, participant_limit):
+    response = get_supabase_client().table("programmes").update({
+        "deposit_amount": deposit_amount,
+        "participant_limit": participant_limit
+    }).eq(
+        "id", programme_id
+    ).select("id").execute()
 
-def add_programme_participant(
+    return bool(response.data)
+
+
+def update_participant_details(
+    participant_id,
     programme_id,
     participant_name,
     participant_email
 ):
+    response = get_supabase_client().table("programme_participants").update({
+        "participant_name": participant_name,
+        "participant_email": participant_email
+    }).eq(
+        "id", participant_id
+    ).eq(
+        "programme_id", programme_id
+    ).select("id").execute()
 
-    conn = create_connection()
-    cursor = conn.cursor()
+    return bool(response.data)
 
-    cursor.execute("""
-        INSERT INTO programme_participants (
-            programme_id,
-            participant_name,
-            participant_email
-        )
-        VALUES (?, ?, ?)
-    """, (
-        programme_id,
-        participant_name,
-        participant_email
-    ))
 
-    conn.commit()
-    conn.close()
+def delete_participant_payment_proof(participant_id, programme_id):
+    response = get_supabase_client().table("programme_participants").update({
+        "payment_proof": None
+    }).eq(
+        "id", participant_id
+    ).eq(
+        "programme_id", programme_id
+    ).select("id").execute()
 
-def get_programme_participants(programme_id):
+    return bool(response.data)
 
-    conn = create_connection()
-    cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT
-            id,
-            participant_name,
-            participant_email,
-            payment_status,
-            payment_proof,
-            registered_at
-        FROM programme_participants
-        WHERE programme_id = ?
-        ORDER BY registered_at DESC
-    """, (programme_id,))
+# =========================================================
+# LEGACY SQLITE SETUP COMPATIBILITY
+# =========================================================
 
-    participants = cursor.fetchall()
+def create_connection():
+    raise RuntimeError(
+        "SQLite is no longer used. This project now connects to Supabase."
+    )
 
-    conn.close()
 
-    return participants
-def update_participant_payment_status(
-    participant_id,
-    programme_id,
-    payment_status
-):
-    conn = create_connection()
-    cursor = conn.cursor()
+def update_club_expenses_table():
+    # Supabase schema has already been created.
+    return True
 
-    cursor.execute("""
-        UPDATE programme_participants
-        SET payment_status = ?
-        WHERE id = ? AND programme_id = ?
-    """, (payment_status, participant_id, programme_id))
 
-    conn.commit()
+def create_table():
+    # Supabase schema has already been created.
+    return True
 
-    updated = cursor.rowcount > 0
 
-    conn.close()
+def create_programmes_table():
+    # Supabase schema has already been created.
+    return True
 
-    return updated
-def update_participant_payment_proof(
-    participant_id,
-    programme_id,
-    payment_proof
-):
-    conn = create_connection()
-    cursor = conn.cursor()
 
-    cursor.execute("""
-        UPDATE programme_participants
-        SET payment_proof = ?
-        WHERE id = ? AND programme_id = ?
-    """, (payment_proof, participant_id, programme_id))
+def create_participants_table():
+    # Supabase schema has already been created.
+    return True
 
-    conn.commit()
 
-    updated = cursor.rowcount > 0
-
-    conn.close()
-
-    return updated
-def update_programme(programme_id, deposit_amount, participant_limit):
-
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE programmes
-        SET deposit_amount = ?,
-            participant_limit = ?
-        WHERE id = ?
-    """, (deposit_amount, participant_limit, programme_id))
-
-    conn.commit()
-    updated = cursor.rowcount > 0
-    conn.close()
-
-    return updated
-def update_participant_details(participant_id, programme_id, participant_name, participant_email):
-
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE programme_participants
-        SET participant_name = ?,
-            participant_email = ?
-        WHERE id = ? AND programme_id = ?
-    """, (
-        participant_name,
-        participant_email,
-        participant_id,
-        programme_id
-    ))
-
-    conn.commit()
-    updated = cursor.rowcount > 0
-    conn.close()
-
-    return updated
-def delete_participant_payment_proof(
-    participant_id,
-    programme_id
-):
-    conn = create_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE programme_participants
-        SET payment_proof = NULL
-        WHERE id = ? AND programme_id = ?
-    """, (participant_id, programme_id))
-
-    conn.commit()
-
-    updated = cursor.rowcount > 0
-
-    conn.close()
-
-    return updated
 if __name__ == "__main__":
-    create_table()
-    update_club_expenses_table()
-    create_programmes_table()
-    create_participants_table()
-    print("Database and expense table created successfully!")
-    
+    print("This application uses Supabase PostgreSQL.")
