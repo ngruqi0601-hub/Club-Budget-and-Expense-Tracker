@@ -67,9 +67,9 @@ if role == "Treasurer":
 
         deposit_amount = st.number_input(
             "Deposit Amount (RM)",
-            min_value=0.01,
-            value=20.00,
-            step=5.00
+            min_value=0.0,
+            value=0.0,
+            step=5.0
         )
         participant_limit = st.number_input(
             "Maximum Number of Participants",
@@ -89,6 +89,8 @@ if role == "Treasurer":
 
             elif participant_limit <= 0:
                 st.warning("Please enter a valid participant limit.")
+            elif deposit_amount <= 0:
+                st.warning("Please enter a valid deposit amount.")
 
             else:
                 success = add_programme(
