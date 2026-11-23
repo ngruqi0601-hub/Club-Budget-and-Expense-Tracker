@@ -38,11 +38,15 @@ def upload_receipt(receipt, club_id):
     return file_path
 # Download receipt from Supabase Storage
 def download_receipt(file_path):
+    try:
+        supabase = get_supabase_client()
 
-    supabase = get_supabase_client()
+        response = supabase.storage.from_("receipts").download(
+            file_path
+        )
 
-    receipt_data = supabase.storage.from_("receipts").download(
-        file_path
-    )
+        return response
 
-    return receipt_data
+    except Exception as e:
+        print(f"Receipt download error: {e}")
+        return None

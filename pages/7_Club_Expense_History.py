@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import os
-
+from storage import download_receipt
 from database import (
     get_club_expenses,
     get_user_id,
@@ -95,16 +95,21 @@ if expenses:
         receipt_path = expense[5]
 
         with st.expander(f"📄 {expense_name}"):
-            if receipt_path and os.path.exists(receipt_path):
-                with open(receipt_path, "rb") as file:
+
+            if receipt_path:
+                receipt_data = download_receipt(receipt_path)
+
+                if receipt_data:
                     st.download_button(
                         label="Download Receipt",
-                        data=file,
+                        data=receipt_data,
                         file_name=os.path.basename(receipt_path),
                         key=f"receipt_{expense_id}"
                     )
+                else:
+                    st.warning("Receipt file not found in Supabase Storage.")
             else:
-                st.warning("Receipt file not found.")
+                st.warning("No receipt attached to this expense.")
 
-else:
-    st.info("No club expenses have been submitted yet.")
+    else:
+        st.info("No club expenses have been submitted yet.")
